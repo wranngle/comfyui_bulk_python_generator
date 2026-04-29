@@ -66,11 +66,12 @@ def load(path: Path | None = None) -> Config:
     cfg_path = path or find_config()
     with cfg_path.open("rb") as f:
         d = tomllib.load(f)
-    repo_root = cfg_path.parent
     p = d["paths"]
-    # Default the data CSVs to repo-shipped ones; override via config or env.
-    ai = p.get("ai_prompts_csv") or str(repo_root / "data" / "ai_metadata_prompts.csv")
-    cap = p.get("captions_csv") or str(repo_root / "data" / "captions.csv")
+    # data/*.csv ship with the package — resolve from the package root, NOT cfg_path.parent
+    # (so user-supplied configs from any cwd still find the bundled CSVs).
+    pkg_data = Path(__file__).resolve().parents[2] / "data"
+    ai = p.get("ai_prompts_csv") or str(pkg_data / "ai_metadata_prompts.csv")
+    cap = p.get("captions_csv") or str(pkg_data / "captions.csv")
     return Config(
         paths=Paths(
             assembly_root=p["assembly_root"],

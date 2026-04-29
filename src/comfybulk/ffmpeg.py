@@ -113,9 +113,14 @@ def encode_args(crf: int = 18, preset: str = "veryfast",
 
 
 def atempo_chain(ratio: float) -> str:
-    """ffmpeg atempo only supports 0.5–2.0; chain via sqrt for extreme ratios."""
+    """ffmpeg atempo only supports 0.5-2.0; chain N copies of ratio**(1/N) for extreme ratios.
+    The legacy PowerShell version used sqrt only, which silently broke for ratios <0.25 or >4.0."""
+    import math
+    if ratio <= 0:
+        raise ValueError(f"atempo ratio must be > 0, got {ratio}")
     if 0.5 <= ratio <= 2.0:
         return f"atempo={ratio:.6f}"
-    import math
-    f = math.sqrt(ratio)
-    return f"atempo={f:.6f},atempo={f:.6f}"
+    bound_log = math.log(2.0) if ratio > 1 else math.log(0.5)
+    n = max(2, math.ceil(math.log(ratio) / bound_log))
+    step = ratio ** (1.0 / n)
+    return ",".join(f"atempo={step:.6f}" for _ in range(n))
