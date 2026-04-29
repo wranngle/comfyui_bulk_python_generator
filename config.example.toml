@@ -1,0 +1,31 @@
+# Paths are stored Windows-style (D:\...) because they're passed to Windows ffmpeg.exe.
+# Python file IO converts to /mnt/d/... via comfybulk.ffmpeg.to_posix() when needed.
+
+[paths]
+assembly_root  = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker'
+favorites_root = 'D:\ComfyUI\ComfyUI\output\favorites'
+audio_folder   = 'D:\ComfyUI\ComfyUI\output\favorites\audio'
+neg_audio      = 'D:\ComfyUI\ComfyUI\output\favorites\audio\negatives'
+cta_folder     = 'D:\ComfyUI\ComfyUI\output\favorites\CTA'
+templates      = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker\templates'
+metadata_csv   = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker\metadata.csv'
+# These two ship with the repo under data/ but can be overridden:
+# ai_prompts_csv = 'data/ai_metadata_prompts.csv'
+# captions_csv   = 'data/captions.csv'
+
+[ollama]
+host  = 'http://localhost:11434'
+model = 'josiefied-qwen3-8b:latest'
+gguf_path = 'D:\ComfyUI\.ollama\models\Josiefied-Qwen3-8B-abliterated-v1.Q6_K.gguf'
+
+[encode]
+crf      = 18
+preset   = 'veryfast'
+target_w = 1080
+target_h = 1920
+fps      = 60
+
+[font]
+file = 'C:/Windows/Fonts/arial.ttf'
+size = 120
+border_w = 36

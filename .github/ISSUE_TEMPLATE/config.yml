@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "🔒 Security vulnerability"
+    url: "https://example.com/REPO_URL_NOT_DETECTED/security/advisories/new"
+    about: "Privately report a security vulnerability."
+  - name: "💬 Question or discussion"
+    url: "https://example.com/REPO_URL_NOT_DETECTED/discussions"
+    about: "Open a discussion instead of an issue."

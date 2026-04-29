@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.venv/
+dist/
+build/
+target/
+
+# Local config (paths are user-specific; commit config.example.toml only)
+config.toml
+.env
+.env.*
+
+# Test scratch
+.testtmp/
+.assessment.cache
+
+# OS / editor
+.DS_Store
+*.swp
+*.tmp
+*.log
+node_modules/
