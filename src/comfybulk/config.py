@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os, sys, tomllib
 from dataclasses import dataclass
+from importlib.resources import files as pkg_files
 from pathlib import Path
 
 
@@ -67,9 +68,9 @@ def load(path: Path | None = None) -> Config:
     with cfg_path.open("rb") as f:
         d = tomllib.load(f)
     p = d["paths"]
-    # data/*.csv ship with the package — resolve from the package root, NOT cfg_path.parent
-    # (so user-supplied configs from any cwd still find the bundled CSVs).
-    pkg_data = Path(__file__).resolve().parents[2] / "data"
+    # data/*.csv ship inside the package (importlib.resources finds them whether installed,
+    # editable-installed, or run from source).
+    pkg_data = pkg_files("comfybulk") / "data"
     ai = p.get("ai_prompts_csv") or str(pkg_data / "ai_metadata_prompts.csv")
     cap = p.get("captions_csv") or str(pkg_data / "captions.csv")
     return Config(

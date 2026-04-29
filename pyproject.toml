@@ -7,9 +7,22 @@ name = "comfyui_bulk_python_generator"
 version = "0.1.0"
 description = "ComfyUI media post-processing pipeline: extract metadata, build variants, apply effects, fill via local LLM"
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [{ name = "wranngle" }]
+keywords = ["comfyui", "ffmpeg", "video", "pipeline", "metadata", "ollama"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+]
 dependencies = [
     "requests>=2.31",
 ]
@@ -25,6 +38,9 @@ comfybulk = "comfybulk.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+comfybulk = ["data/*.csv", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

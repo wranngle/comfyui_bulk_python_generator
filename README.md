@@ -18,22 +18,31 @@ src/comfybulk/
 ├── variants.py   # grid (2x2), montage, single, cta_only
 ├── tools.py      # fastpingpong, timestretch, convert (webp/webm → mp4)
 ├── pipeline.py   # bulk orchestrator (entry point of the pipeline)
-└── __main__.py   # CLI: `comfybulk <subcommand>`
+├── __main__.py   # CLI: `comfybulk <subcommand>`
+└── data/         # bundled with the package via importlib.resources
+    ├── ai_metadata_prompts.csv  # LLM prompt templates per metadata field
+    └── captions.csv             # CTA caption strings
 
-data/
-├── ai_metadata_prompts.csv  # LLM prompt templates per metadata field
-└── captions.csv              # CTA caption strings
-
-config.toml                   # paths to media, audio, CTA, templates, metadata.csv
+config.example.toml              # template — copy to config.toml + edit paths
 ```
 
-## Setup
+## Install
 
 ```bash
-cd ~/dev/comfyui_bulk_python_generator   # or /mnt/c/Users/root/dev/...
+# editable install for development (from a Linux-native path; building from /mnt/c
+# may fail with NTFS permission errors on the egg-info dir)
+git clone https://github.com/wranngle/comfyui_bulk_python_generator.git
+cd comfyui_bulk_python_generator
 python3 -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-cp config.example.toml config.toml  # edit paths if needed
+cp config.example.toml config.toml      # edit paths to match your setup
+```
+
+Or build a wheel and install it from anywhere:
+
+```bash
+pip wheel --no-deps --wheel-dir dist .
+pip install dist/comfyui_bulk_python_generator-0.1.0-py3-none-any.whl
 ```
 
 ## Run

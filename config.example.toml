@@ -9,9 +9,9 @@ neg_audio      = 'D:\ComfyUI\ComfyUI\output\favorites\audio\negatives'
 cta_folder     = 'D:\ComfyUI\ComfyUI\output\favorites\CTA'
 templates      = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker\templates'
 metadata_csv   = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker\metadata.csv'
-# These two ship with the repo under data/ but can be overridden:
-# ai_prompts_csv = 'data/ai_metadata_prompts.csv'
-# captions_csv   = 'data/captions.csv'
+# These two ship inside the package (importlib.resources) — only set to override:
+# ai_prompts_csv = '/path/to/your/ai_metadata_prompts.csv'
+# captions_csv   = '/path/to/your/captions.csv'
 
 [ollama]
 host  = 'http://localhost:11434'

@@ -1,6 +1,6 @@
 """ffmpeg/ffprobe subprocess wrappers + WSL↔Windows path conversion."""
 from __future__ import annotations
-import os, shutil, subprocess, sys
+import math, os, shutil, subprocess, sys
 from pathlib import Path
 
 FFMPEG = "ffmpeg.exe" if shutil.which("ffmpeg.exe") else "ffmpeg"
@@ -115,7 +115,6 @@ def encode_args(crf: int = 18, preset: str = "veryfast",
 def atempo_chain(ratio: float) -> str:
     """ffmpeg atempo only supports 0.5-2.0; chain N copies of ratio**(1/N) for extreme ratios.
     The legacy PowerShell version used sqrt only, which silently broke for ratios <0.25 or >4.0."""
-    import math
     if ratio <= 0:
         raise ValueError(f"atempo ratio must be > 0, got {ratio}")
     if 0.5 <= ratio <= 2.0:
