@@ -32,6 +32,41 @@ def to_posix(p: str | Path) -> str:
     return s
 
 
+def filter_path(p: str | Path) -> str:
+    """Escape a path for use inside an ffmpeg filter option value."""
+    return str(p).replace("\\", "/").replace(":", r"\\:")
+
+
+def filter_text(text: str) -> str:
+    """Escape text for single-quoted ffmpeg filter option values."""
+    s = " ".join(str(text).splitlines()).strip()
+    return (s.replace("\\", r"\\")
+             .replace("'", r"\'")
+             .replace(":", r"\:")
+             .replace(",", r"\,")
+             .replace("[", r"\[")
+             .replace("]", r"\]")
+             .replace(";", r"\;"))
+
+
+def drawtext_filter(text: str, font_path: str | Path, *, font_size: int = 120,
+                    border_w: int = 36, y: str = "h-text_h-288",
+                    fontcolor: str = "white@0.9",
+                    bordercolor: str = "black@0.8",
+                    x: str = "(w-text_w)/2") -> str:
+    """Build a drawtext filter with centralized font/text escaping."""
+    return (f"drawtext=fontfile={filter_path(font_path)}:"
+            f"text='{filter_text(text)}':fontsize={font_size}:"
+            f"fontcolor={fontcolor}:bordercolor={bordercolor}:borderw={border_w}:"
+            f"x={x}:y={y}")
+
+
+def concat_file_line(p: str | Path) -> str:
+    """Build a concat-demuxer file line using slash paths and escaped quotes."""
+    s = to_win(p).replace("\\", "/").replace("'", r"'\''")
+    return f"file '{s}'"
+
+
 def exists(p: str | Path) -> bool:
     return os.path.exists(to_posix(p))
 

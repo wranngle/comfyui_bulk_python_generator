@@ -24,6 +24,7 @@ class Ollama:
     host: str
     model: str
     gguf_path: str
+    auto_launch: bool = False
 
 
 @dataclass

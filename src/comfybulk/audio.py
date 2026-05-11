@@ -34,6 +34,8 @@ def mix_random_audio(input_video: str, audio_folder: str, *, output_video: str |
         raise RuntimeError("Could not probe video or audio duration")
     ratio = vd / ad
     has_orig = probe_has_audio(input_video)
+    fade_d = min(0.3, vd)
+    fade_out = max(vd - fade_d, 0.0)
 
     if not output_video:
         in_path = Path(to_posix(input_video))
@@ -43,8 +45,8 @@ def mix_random_audio(input_video: str, audio_folder: str, *, output_video: str |
         atempo_chain(ratio),
         "aresample=48000:resampler=soxr:precision=28:dither_method=triangular",
         "highshelf=f=8000:g=-2:width_type=h:width=500,lowpass=f=18000:poles=2",
-        "afade=t=in:st=0:d=0.3",
-        f"afade=t=out:st={vd-0.3:.6f}:d=0.3",
+        f"afade=t=in:st=0:d={fade_d:.6f}",
+        f"afade=t=out:st={fade_out:.6f}:d={fade_d:.6f}",
         "acompressor=threshold=-16dB:ratio=8:attack=3:release=100:makeup=3",
         "equalizer=f=100:width_type=h:width=200:g=2,equalizer=f=3000:width_type=h:width=1000:g=-1.5,equalizer=f=10000:width_type=h:width=2000:g=-2",
         "loudnorm=I=-14:TP=-1.5:LRA=7",

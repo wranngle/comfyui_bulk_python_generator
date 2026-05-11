@@ -11,7 +11,8 @@ def cmd_pipeline(a):
     cfg = load(Path(a.config) if a.config else None)
     outs = run(a.variant, a.source, quantity=a.quantity, cfg=cfg,
                audio_source=a.audio_source, reversal_speed=a.reversal_speed,
-               no_effects=a.no_effects)
+               no_effects=a.no_effects, organize_favorites=a.organize,
+               seed=a.seed, write_manifest=a.write_manifest)
     print(f"\n=== Generated {len(outs)} output(s) ===")
     for o in outs:
         print(f"  {o}")
@@ -36,6 +37,8 @@ def cmd_extract(a):
 def cmd_fill(a):
     from .fill import fill
     cfg = load(Path(a.config) if a.config else None)
+    if a.auto_launch_ollama:
+        cfg.ollama.auto_launch = True
     n = fill(cfg)
     print(f"Filled {n} field(s)")
 
@@ -121,6 +124,12 @@ def main():
     sp.add_argument("--reversal-speed", type=float, default=4.0)
     sp.add_argument("--no-effects", action="store_true",
                     help="Skip effects stack; output clean dual cta/nocta variants")
+    sp.add_argument("--organize", action="store_true",
+                    help="Opt in to organizing cfg.paths.favorites_root before processing")
+    sp.add_argument("--seed", type=int,
+                    help="Seed pipeline clip/CTA/audio choices for reproducible selection")
+    sp.add_argument("--write-manifest", action="store_true",
+                    help="Append run metadata to finals/pipeline_manifest.jsonl")
     sp.set_defaults(func=cmd_pipeline)
 
     sp = sub.add_parser("extract", help="Extract ComfyUI metadata into metadata.csv")
@@ -130,6 +139,8 @@ def main():
     sp.set_defaults(func=cmd_extract)
 
     sp = sub.add_parser("fill", help="Fill empty LLM-generated CSV fields via Ollama")
+    sp.add_argument("--auto-launch-ollama", action="store_true",
+                    help="Opt in to launching `ollama serve` if Ollama is not reachable")
     sp.set_defaults(func=cmd_fill)
 
     sp = sub.add_parser("organize", help="Group media into prompt-named subfolders")

@@ -9,37 +9,34 @@ from __future__ import annotations
 import random, subprocess
 from datetime import datetime
 from pathlib import Path
+import warnings
 
-from .ffmpeg import FFMPEG, encode_args, probe_duration, to_posix, to_win
+from .ffmpeg import FFMPEG, concat_file_line, drawtext_filter, encode_args, probe_duration, to_posix, to_win
 
 
 # ---------- helpers ----------
 
-def _font_for_filter(font_path: str) -> str:
-    """Escape colon + backslash for ffmpeg's two-level filter parser.
-    drawtext fontfile=C:/foo wants `C\\:/foo` after the filtergraph layer eats one `\\`."""
-    return font_path.replace("\\", "/").replace(":", r"\\:")
-
-
 def _escape_caption(text: str) -> str:
-    return (text.replace("\n", " ").replace("'", "")
-            .replace(":", " ").replace("|", " ").strip())
+    return " ".join(text.splitlines()).strip()
 
 
 def _drawtext(text: str, font_path: str, *, font_size: int = 120, border_w: int = 36,
               y: str = "h-text_h-288") -> str:
-    # ffmpeg drawtext: wrap text in single quotes so spaces don't break option parsing.
-    safe = _escape_caption(text).replace("\\", "\\\\").replace("'", "")
-    return (f"drawtext=fontfile={_font_for_filter(font_path)}:"
-            f"text='{safe}':fontsize={font_size}:"
-            f"fontcolor=white@0.9:bordercolor=black@0.8:borderw={border_w}:"
-            f"x=(w-text_w)/2:y={y}")
+    return drawtext_filter(_escape_caption(text), font_path, font_size=font_size, border_w=border_w, y=y)
 
 
 def _write_concat_list(temp: Path, ts: str, paths: list[str]) -> Path:
-    lst = temp / f"concat_{ts}.txt"
-    lst.write_text("\n".join(f"file '{to_win(p)}'" for p in paths), encoding="ascii")
+    rid = "%06x" % random.randrange(16**6)
+    lst = temp / f"concat_{ts}_{rid}.txt"
+    lst.write_text("\n".join(concat_file_line(p) for p in paths), encoding="utf-8")
     return lst
+
+
+def _run_optional_ffmpeg(args: list[str], context: str) -> None:
+    r = subprocess.run(args, check=False, capture_output=True, text=True)
+    if r.returncode != 0:
+        detail = (r.stderr or r.stdout or "").strip()
+        warnings.warn(f"{context} failed with exit code {r.returncode}: {detail}", RuntimeWarning)
 
 
 # ---------- grid (2x2 ping-pong) ----------
@@ -60,6 +57,8 @@ def build_grid(input_folder: str, output_folder: str, *, fast_mode: bool = True,
     durations = [probe_duration(str(c)) for c in selected]
     target = max(durations)
 
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    rid = "%06x" % random.randrange(16**6)
     normalized: list[Path] = []
     for i, (clip, dur) in enumerate(zip(selected, durations)):
         stretch = target / dur if dur else 1.0
@@ -74,15 +73,13 @@ def build_grid(input_folder: str, output_folder: str, *, fast_mode: bool = True,
         else:
             vf += (f",scale={cell_w}:{cell_h}:force_original_aspect_ratio=increase,"
                    f"crop={cell_w}:{cell_h},setsar=1,format=yuv420p[out]")
-        tmp = dest / f"pingpong_{i}.mp4"
+        tmp = dest / f"pingpong_{ts}_{rid}_{i}.mp4"
         subprocess.run([FFMPEG, "-loglevel", "error", "-y", "-i", to_win(str(clip)),
                         "-filter_complex", vf, "-map", "[out]", "-an",
                         "-c:v", "libx264", "-crf", str(crf), "-preset", preset,
                         to_win(str(tmp))], check=True)
         normalized.append(tmp)
 
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    rid = "%06x" % random.randrange(16**6)
     out = dest / f"grid_pingpong_{ts}_{rid}.mp4"
     layout = f"0_0|{cell_w}_0|0_{cell_h}|{cell_w}_{cell_h}"
     args = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y"]
@@ -106,7 +103,7 @@ def build_montage(clips: list[str], output: str, *, target_w: int = 1080, target
         temp_dir = str(Path(to_posix(output)).parent / "temp")
     temp = Path(temp_dir)
     temp.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     lst = _write_concat_list(temp, ts, clips)
     subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
                     "-f", "concat", "-safe", "0", "-i", to_win(str(lst)),
@@ -135,19 +132,22 @@ def build_single(clip: str, output: str, *, target_w: int = 1080, target_h: int 
 def _make_metadata_files(out_video: str, audio_path: str | None, ts: str, prefix: str, temp: Path):
     """Snapshot PNG + audio MP3 (+ negative MP3) — preserved from create_*.ps1."""
     snap = temp / f"{prefix}_{ts}_snapshot.png"
-    subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-                    "-ss", "3", "-i", to_win(out_video), "-vframes", "1",
-                    "-q:v", "2", to_win(str(snap))], check=False)
+    _run_optional_ffmpeg([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
+                          "-ss", "3", "-i", to_win(out_video), "-vframes", "1",
+                          "-q:v", "2", to_win(str(snap))],
+                         f"snapshot metadata for {out_video}")
     if audio_path and Path(to_posix(audio_path)).exists():
         a1 = temp / f"{prefix}_{ts}_audio.mp3"
-        subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", to_win(audio_path), "-t", "13", "-c:a", "mp3",
-                        "-b:a", "192k", to_win(str(a1))], check=False)
+        _run_optional_ffmpeg([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
+                              "-i", to_win(audio_path), "-t", "13", "-c:a", "mp3",
+                              "-b:a", "192k", to_win(str(a1))],
+                             f"audio metadata for {audio_path}")
         a2 = temp / f"{prefix}_{ts}_audio_negative.mp3"
-        subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
-                        "-i", to_win(audio_path), "-af", "areverse",
-                        "-t", "13", "-c:a", "mp3", "-b:a", "192k",
-                        to_win(str(a2))], check=False)
+        _run_optional_ffmpeg([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
+                              "-i", to_win(audio_path), "-af", "areverse",
+                              "-t", "13", "-c:a", "mp3", "-b:a", "192k",
+                              to_win(str(a2))],
+                             f"negative audio metadata for {audio_path}")
 
 
 def clean_single(clip: str, output_folder: str, ts: str, *, cta_caption: str | None,
@@ -198,8 +198,9 @@ def clean_montage(clips: list[str], output_folder: str, ts: str, *, cta_caption:
     temp.mkdir(parents=True, exist_ok=True)
 
     numbered: list[str] = []
+    batch = "%06x" % random.randrange(16**6)
     for i, c in enumerate(clips, start=1):
-        n = temp / f"{i:02d}_{Path(to_posix(c)).name}"
+        n = temp / f"{ts}_{batch}_{i:02d}_{Path(to_posix(c)).name}"
         n.write_bytes(Path(to_posix(c)).read_bytes())
         numbered.append(str(n))
 
@@ -254,9 +255,8 @@ def clean_cta_only(cta_folder: str, output_folder: str, ts: str, *, cta_caption:
     out = temp / f"cta_only_{ts}.mp4"
 
     if cta_caption:
-        safe = _escape_caption(cta_caption).replace("'", "")
-        dt = (f"drawtext=fontfile={_font_for_filter(font_path)}:text='{safe}':"
-              f"fontsize={font_size}:fontcolor=white:x=(w-text_w)/2:y={text_y}")
+        dt = drawtext_filter(_escape_caption(cta_caption), font_path, font_size=font_size,
+                             border_w=0, y=text_y, fontcolor="white", bordercolor="black@0")
         vf = f"scale={target_w}:{target_h},fps={fps},{dt}"
     else:
         vf = f"scale={target_w}:{target_h},fps={fps}"

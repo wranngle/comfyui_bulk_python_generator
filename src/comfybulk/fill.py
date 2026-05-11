@@ -1,19 +1,19 @@
-"""LLM-driven metadata fill via local Ollama. Ports Fill-VideoMetadata.ps1.
+"""LLM-driven metadata fill via local Ollama.
 
 For each row with a content_prompt: sends one Ollama request per empty field whose
 prompt template exists in ai_metadata_prompts.csv. Detects existing duplicate values
-across the CSV (per critical field), clears them, and regenerates with boosted
-randomness (temp/top_p/repeat_penalty) to break out of LLM repetition.
+across the CSV (per generated field), keeps the first occurrence, clears later
+duplicates, and regenerates with explicit context about what must differ.
 """
 from __future__ import annotations
-import csv, random, re, shutil, subprocess, time
+import csv, os, re, shutil, subprocess, tempfile, time
 from datetime import datetime
 from pathlib import Path
 
 import requests
 
 from .config import Config
-from .extract import remove_banned
+from .extract import replace_discouraged_terms
 from .ffmpeg import to_posix
 
 
@@ -42,41 +42,62 @@ def _read_csv(path: str) -> tuple[list[str], list[dict]]:
 
 
 def _write_csv(path: str, fieldnames: list[str], rows: list[dict], retries: int = 3, wait: int = 20):
-    posix = to_posix(path)
+    target = Path(to_posix(path))
     last = None
     for i in range(retries):
+        tmp_path = None
         try:
-            with open(posix, "w", encoding="utf-8", newline="") as f:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                newline="",
+                dir=str(target.parent),
+                prefix=f".{target.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as f:
+                tmp_path = Path(f.name)
                 w = csv.DictWriter(f, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
                 w.writeheader()
                 for r in rows:
                     w.writerow({k: r.get(k, "") for k in fieldnames})
+            os.replace(tmp_path, target)
             return
         except (OSError, IOError) as e:
             last = e
+            if tmp_path:
+                tmp_path.unlink(missing_ok=True)
             if i < retries - 1:
                 time.sleep(wait)
     raise RuntimeError(f"CSV write failed: {last}")
 
 
+def _ollama_auto_launch_enabled(cfg: Config) -> bool:
+    explicit_cfg = bool(getattr(cfg.ollama, "auto_launch", False))
+    explicit_env = os.environ.get("COMFYBULK_AUTO_LAUNCH_OLLAMA", "").strip().lower() in {"1", "true", "yes", "on"}
+    return explicit_cfg or explicit_env
+
+
 def ensure_ollama(cfg: Config) -> None:
-    """Try to reach Ollama; if not running, attempt to launch it locally."""
+    """Try to reach Ollama; optionally start `ollama serve` only when explicitly enabled."""
     try:
         r = requests.get(f"{cfg.ollama.host}/api/tags", timeout=5)
         if r.ok:
             return
     except requests.RequestException:
         pass
-    # Try to start the Ollama desktop app on Windows.
-    candidates = [
-        Path("/mnt/c/Users/root/AppData/Local/Programs/Ollama/ollama app.exe"),
-        Path("/mnt/c/Users/user/AppData/Local/Programs/Ollama/ollama app.exe"),
-    ]
-    for app in candidates:
-        if app.exists():
-            subprocess.Popen([str(app)])
-            time.sleep(5)
-            break
+    if not _ollama_auto_launch_enabled(cfg):
+        print("[OLLAMA] Not reachable. Start Ollama manually, or opt in with cfg.ollama.auto_launch=True or COMFYBULK_AUTO_LAUNCH_OLLAMA=1.")
+        return
+    exe = shutil.which("ollama")
+    if not exe:
+        print("[OLLAMA] Auto-launch requested, but `ollama` was not found on PATH.")
+        return
+    kwargs = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    subprocess.Popen([exe, "serve"], **kwargs)
+    time.sleep(5)
 
 
 def ensure_model(cfg: Config) -> None:
@@ -89,10 +110,15 @@ def ensure_model(cfg: Config) -> None:
     gguf = to_posix(cfg.ollama.gguf_path)
     if not Path(gguf).exists():
         return
-    modelfile = Path("/tmp/comfybulk_modelfile.txt")
-    modelfile.write_text(f'FROM "{cfg.ollama.gguf_path}"\n')
-    subprocess.run(["ollama", "create", cfg.ollama.model, "-f", str(modelfile)], check=False)
-    modelfile.unlink(missing_ok=True)
+    modelfile = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", prefix="comfybulk_modelfile_", suffix=".txt", delete=False) as f:
+            modelfile = Path(f.name)
+            f.write(f'FROM "{gguf}"\n')
+        subprocess.run(["ollama", "create", cfg.ollama.model, "-f", str(modelfile)], check=False)
+    finally:
+        if modelfile:
+            modelfile.unlink(missing_ok=True)
 
 
 def _clean_response(txt: str) -> str:
@@ -121,23 +147,35 @@ def ollama_generate(cfg: Config, prompt: str, *, temp: float, top_p: float, repe
     return _clean_response(r.json().get("response", ""))
 
 
-def _scan_duplicates(rows: list[dict], llm_fields: set[str]) -> dict[tuple[int, str], bool]:
+def _canonical_generated_value(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().casefold()
+
+
+def _field_existing_values(rows: list[dict], field: str, *, skip_index: int) -> set[str]:
+    return {
+        _canonical_generated_value(r.get(field, ""))
+        for i, r in enumerate(rows)
+        if i != skip_index and _canonical_generated_value(r.get(field, ""))
+    }
+
+
+def _scan_duplicates(rows: list[dict], llm_fields: set[str]) -> dict[tuple[int, str], str]:
     """Mark (row_index, field) pairs whose value duplicates another row in the same field.
-    Empties duplicate values in-place so the regen loop reruns them."""
-    dupes: dict[tuple[int, str], bool] = {}
+    Keeps the first occurrence and empties later duplicates in-place so the regen loop reruns them."""
+    dupes: dict[tuple[int, str], str] = {}
     for f in llm_fields:
         if f in EXCLUDED_FROM_DUPE_SCAN or f in SHORT_FIELDS:
             continue
-        counts: dict[str, int] = {}
-        for r in rows:
-            v = r.get(f)
-            if v and v.strip():
-                counts[v] = counts.get(v, 0) + 1
+        seen: dict[str, int] = {}
         for i, r in enumerate(rows):
-            v = r.get(f)
-            if v and counts.get(v, 0) > 1:
+            key = _canonical_generated_value(r.get(f, ""))
+            if not key:
+                continue
+            if key in seen:
                 r[f] = ""
-                dupes[(i, f)] = True
+                dupes[(i, f)] = f"row {seen[key] + 1}"
+            else:
+                seen[key] = i
     return dupes
 
 
@@ -152,7 +190,7 @@ def fill(cfg: Config) -> int:
         f".bak.{datetime.now().strftime('%Y%m%d%H%M%S')}.csv")
     shutil.copy(to_posix(cfg.paths.metadata_csv), bk)
 
-    # Retroactive cleanup: banned terms in LLM-filled fields.
+    # Retroactive cleanup: project vocabulary substitutions in LLM-filled fields.
     cleanable = {"filename", "title", "description", "caption", "cover_text",
                  "pinned_comment", "CTA", "tags", "content_prompt"}
     n_clean = 0
@@ -160,7 +198,7 @@ def fill(cfg: Config) -> int:
         for f in cleanable:
             v = r.get(f)
             if v:
-                cleaned = remove_banned(v)
+                cleaned = replace_discouraged_terms(v)
                 if cleaned != v:
                     r[f] = cleaned
                     n_clean += 1
@@ -178,27 +216,36 @@ def fill(cfg: Config) -> int:
         for f in fieldnames:
             if r.get(f) or f in NEVER_FILL or f not in prompts:
                 continue
-            was_dup = dupes.get((i, f), False)
-            temp = 1.8 if was_dup else 0.8
-            top_p = 0.85 if was_dup else 0.95
-            rp = 1.3 if was_dup else 1.1
-            ctx_len = 500 if was_dup else 200
-            ctx = remove_banned(r["content_prompt"][:ctx_len])
+            duplicate_of = dupes.get((i, f))
+            temp = 0.9 if duplicate_of else 0.7
+            top_p = 0.9
+            rp = 1.15 if duplicate_of else 1.05
+            ctx_len = 500 if duplicate_of else 240
+            ctx = replace_discouraged_terms(r["content_prompt"][:ctx_len])
             unique = f"Row: {i+1}" + (f" | Seed: {r['seed']}" if r.get("seed") else "")
-            if was_dup:
-                unique += f" | UNIQUENESS REQUIRED: Variation #{random.randint(1000, 9999)}"
-            anti = ("\n\n[CRITICAL: This is a RE-GENERATION. Previous output was duplicate. "
-                    "You MUST produce a substantially different, creative variation. Use unexpected "
-                    "word choices, different phrasing, alternative angles. DO NOT repeat common patterns.]"
-                    if was_dup else "")
-            banned = ("\n\n[BANNED TERMS: Never use: DMT, psychedelic, trip, ego-death. "
-                      "Replace with: visionary, abstract, journey, transcendent.]")
-            prompt = f"/no_think\n\nContext: {ctx}...\n{unique}{anti}{banned}\n\nTask: {prompts[f]}"
-            try:
-                txt = remove_banned(ollama_generate(cfg, prompt, temp=temp, top_p=top_p, repeat_penalty=rp))
-            except Exception as e:
-                print(f"[LLM ERROR] row {i+1} field {f}: {e}")
-                continue
+            if duplicate_of:
+                unique += f" | Regenerate because this field matched {duplicate_of}; use a different angle and wording."
+            term_note = ("\n\n[PROJECT VOCABULARY: Avoid these exact terms in metadata: DMT, psychedelic, trip, ego-death. "
+                         "Prefer: visionary, abstract, journey, transcendent.]")
+            existing_values = _field_existing_values(rows, f, skip_index=i)
+            txt = ""
+            for attempt in range(1, 3):
+                retry_note = ""
+                if attempt > 1:
+                    retry_note = "\n\n[RETRY: The previous answer matched existing metadata. Write a clearly different answer.]"
+                prompt = f"/no_think\n\nContext: {ctx}...\n{unique}{term_note}{retry_note}\n\nTask: {prompts[f]}"
+                try:
+                    txt = replace_discouraged_terms(ollama_generate(cfg, prompt, temp=temp, top_p=top_p, repeat_penalty=rp))
+                except Exception as e:
+                    print(f"[LLM ERROR] row {i+1} field {f}: {e}")
+                    txt = ""
+                    break
+                if not txt:
+                    break
+                if _canonical_generated_value(txt) not in existing_values:
+                    break
+                print(f"[LLM RETRY] row {i+1} field {f}: duplicate output on attempt {attempt}")
+                txt = ""
             if not txt:
                 continue
             r[f] = txt

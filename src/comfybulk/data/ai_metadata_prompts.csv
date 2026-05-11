@@ -1,38 +1,10 @@
 field,prompt
-content_prompt,"You are an expert prompt engineer for AI video generation. Your task is to write one dense, cinematic video prompt that follows this formula: Subject (clearly named) + Environment (atmospheric setting) + Motion (specific camera and subject movement) + Visual Style (lighting, color palette, mood) + Quality Tags (renderer + resolution). Requirements: 80-150 tokens, concrete sensory detail, no filler. Include at least two camera moves with strong verbs (pans, tracks, dollies, tilts, orbits). Specify lighting and color palette explicitly. End with style tags such as 'cinematic, Unreal Engine 5, 4K 60fps'. Avoid: vague adjectives, repeated words, brand names. Output one paragraph only."
-caption,"You are a concise caption writer. Write one short caption for a video clip that follows this formula: SUBJECT + ACTION + IMAGE. Rules: ALL CAPS, end with a period, length 3-8 words. Active voice, present tense, evocative but plain language. Avoid jargon, lowercase, multiple sentences. Examples (do not reuse): 'LIGHT FILLS THE ROOM.' 'THE CITY EXHALES SLOWLY.' 'WAVES RETURN TO STILLNESS.'"
-filename,"You are a cross-platform video SEO assistant. Output ONLY a lowercase .mp4 filename of 60 chars or fewer that:
-- Front-loads the primary keyword/topic plus one precise modifier, uses underscores or hyphens, excludes stopwords/filler.
-- Optionally includes a 2-digit sequence (e.g., _v01) if part of a series; no dates or camera codes.
-- Mirrors the video's actual subject to aid indexing on YouTube, Instagram, and TikTok.
-Example form (do not reuse): nature_loop_macro_v01.mp4"
-title,"You are a title strategist for YouTube, Instagram, and TikTok. Output ONE 50-68 character title that:
-- Front-loads the primary keyword/topic in the first 2-3 words.
-- Adds a truthful curiosity hook or payoff signal ('seamless loop', 'final reveal', 'oddly satisfying') without clickbait.
-- Uses evocative but safe descriptors (cinematic, dreamy, immersive); no shock language.
-- Reads clean on mobile; no emojis; no ALL-CAPS shouting; no bracket spam.
-Clarity over poetry. Promise only what the video delivers."
-description,"You are a cross-platform description writer. Output a ready-to-post block of 1000 chars or fewer that follows:
-- Line 1 (120 chars or fewer): primary keyword + human hook + single soft CTA ('watch to the end', 'save for later', or 'follow for more').
-- Body (1-2 short paragraphs): poetic but concrete summary of what viewers see; naturally weave 4-7 related terms (loop, ambient, satisfying, cinematic, abstract) without stuffing; mention one mid-clip payoff (e.g., 'color shift at :15').
-- Links and Hashtags: on a new line, include up to 2 short links with verbs ('Explore: ...', 'More: ...'). Then add 2-3 precise hashtags tuned for cross-platform search. No emojis.
-Output the final text only."
-tags,"You are a multi-platform keyword generator. Output a single comma-separated list of 7-10 items that:
-- Mixes 2-3 broad category terms (digital art, animation, ambient) with 4-7 niche long-tails and exact phrases (e.g., 'seamless loop', 'macro footage', 'satisfying animation').
-- Includes 1-2 common misspellings/synonyms if relevant, to catch variant searches.
-- Excludes spam, unrelated trends, and shock terms.
-- Suitable as YouTube tags AND convertible to Instagram/TikTok hashtags (no leading # here).
-Return only the comma-separated list."
-cover_text,"You are a visual hook strategist. Output ONE 2-4 word overlay phrase that:
-- Is legible on mobile, centered within a safe middle band, and uses high-contrast wording (no thin scripts).
-- Carries one semantic keyword the algorithms can parse (e.g., 'Loop', 'Macro', 'Reveal').
-- Signals payoff or sensation ('Seamless Loop', 'Satisfying Bloom', 'Quiet Moment') without cliches.
-- Works for YouTube thumbnails and Instagram/TikTok covers; no hashtags, no emojis, no platform names."
-pinned_comment,"You are a community engagement crafter. Output ONE 1-2 sentence pinned comment that:
-- Sparks replies with a pointed, answerable prompt; optionally nudges a single action (save/share/follow) without sounding salesy.
-- Encourages rewatch or detail-seeking ('Spot the hidden detail', 'Did the loop fool you?') to increase completion and rewatch.
-- Max one emoji allowed; none required.
-Example form (do not reuse): 'Quiet wins again. What did you notice on the second pass?'"
-CTA,"You are a cross-platform CTA writer. Output ONE sentence of 120 chars or fewer that targets exactly ONE behavior (comment OR follow OR save/share). Tone: warm, specific.
-Good patterns: 'Save to revisit this loop.' 'Tell me the moment that grabbed you.' 'Follow for tomorrow's reveal.'
-No emojis. No stacked CTAs."
+content_prompt,"Write one video-generation prompt based on the context. Include a clear subject, setting, visible motion, camera motion, lighting, color palette, and mood. Use concrete image details instead of hype words. Length: 70-130 words. One paragraph only. Do not mention platforms, algorithms, virality, or safety."
+caption,"Write one caption in ALL CAPS. Length: 3-8 words. Use plain active language about what is visibly happening. End with a period. Return only the caption."
+filename,"Return one lowercase .mp4 filename, 60 characters or fewer. Use words from the actual subject and motion. Separate words with underscores or hyphens. No dates, camera codes, hashtags, platform names, or filler adjectives."
+title,"Write one title, 45-70 characters. Start with the main subject. Add one truthful detail about the motion, reveal, loop, or atmosphere. No clickbait, emojis, ALL-CAPS shouting, brackets, or platform references."
+description,"Write a ready-to-post description under 700 characters. Line 1: a direct subject hook plus one gentle action if useful. Body: 1 short paragraph describing what viewers see, including one specific visual change or moment. Final line: 2-3 relevant hashtags. No links unless the context explicitly contains one."
+tags,"Return 7-10 comma-separated tags. Mix broad category terms with specific subject, style, motion, and loop terms from the context. No leading #, unrelated trends, shock terms, or misspellings unless the context itself uses them."
+cover_text,"Return one 2-4 word cover phrase. Make it readable on mobile and tied to the visible subject, motion, loop, or reveal. No hashtags, emojis, platform names, or generic commands."
+pinned_comment,"Write one pinned comment in 1-2 sentences. Ask a specific, answerable question about a visible detail or moment. Avoid sales language and stacked calls to action. No emojis unless the context strongly supports one."
+CTA,"Write one sentence under 120 characters that asks for exactly one action: comment, follow, save, or share. Make it specific to the clip. No emojis and no stacked CTAs."

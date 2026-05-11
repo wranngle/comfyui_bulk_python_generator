@@ -1,10 +1,10 @@
 """Standalone CLI tools: fastpingpong, timestretch, convert (webp/webm → mp4)."""
 from __future__ import annotations
-import math, shutil, subprocess
+import math, random, shutil, subprocess
 from datetime import datetime
 from pathlib import Path
 
-from .ffmpeg import FFMPEG, atempo_chain, probe_dims, probe_duration, probe_fps, probe_has_audio, to_posix, to_win
+from .ffmpeg import FFMPEG, atempo_chain, concat_file_line, probe_dims, probe_duration, probe_fps, probe_has_audio, to_posix, to_win
 
 
 # ---------- Fast ping-pong ----------
@@ -16,13 +16,15 @@ def fastpingpong(input_video: str, *, speed_percent: int = 1000,
         raise ValueError("speed_percent must be > 100")
     in_path = Path(to_posix(input_video))
     base = in_path.stem
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    rid = "%06x" % random.randrange(16**6)
+    stamp = f"{ts}_{rid}"
     work = in_path.parent
     duration = probe_duration(input_video)
     speed = speed_percent / 100.0
     accel_dur = duration / speed
 
-    speedup = work / f"{base}_speedup_{speed_percent}pct_{ts}.mp4"
+    speedup = work / f"{base}_speedup_{speed_percent}pct_{stamp}.mp4"
     subprocess.run([FFMPEG, "-y", "-i", to_win(input_video),
                     "-filter:v", f"setpts=PTS/{speed}", "-an",
                     "-c:v", "libx264", "-preset", "fast", "-crf", "18",
@@ -31,10 +33,10 @@ def fastpingpong(input_video: str, *, speed_percent: int = 1000,
     cycles = math.ceil(duration / (accel_dur * 2))
     segments: list[Path] = []
     for cycle in range(cycles):
-        f = work / f"{base}_forward_{cycle}_{ts}.mp4"
+        f = work / f"{base}_forward_{cycle}_{stamp}.mp4"
         shutil.copyfile(to_posix(str(speedup)), to_posix(str(f)))
         segments.append(f)
-        r = work / f"{base}_reverse_{cycle}_{ts}.mp4"
+        r = work / f"{base}_reverse_{cycle}_{stamp}.mp4"
         if exponential:
             mult = exponential_base ** (cycle + 1)
             vf = f"reverse,setpts=PTS/{mult}"
@@ -46,15 +48,15 @@ def fastpingpong(input_video: str, *, speed_percent: int = 1000,
                         to_win(str(r))], check=True)
         segments.append(r)
 
-    lst = work / f"{base}_segments_{ts}.txt"
-    lst.write_text("\n".join(f"file '{to_win(str(s))}'" for s in segments), encoding="ascii")
+    lst = work / f"{base}_segments_{stamp}.txt"
+    lst.write_text("\n".join(concat_file_line(s) for s in segments), encoding="utf-8")
 
-    concat = work / f"{base}_concatenated_{ts}.mp4"
+    concat = work / f"{base}_concatenated_{stamp}.mp4"
     subprocess.run([FFMPEG, "-y", "-f", "concat", "-safe", "0",
                     "-i", to_win(str(lst)), "-c", "copy",
                     to_win(str(concat))], check=True)
 
-    out = Path(to_posix(output)) if output else (work / f"{base}_fastpingpong_{speed_percent}pct_{ts}.mp4")
+    out = Path(to_posix(output)) if output else (work / f"{base}_fastpingpong_{speed_percent}pct_{stamp}.mp4")
     subprocess.run([FFMPEG, "-y", "-i", to_win(str(concat)),
                     "-t", f"{duration}",
                     "-c:v", "libx264", "-preset", "fast", "-crf", "18",
@@ -72,6 +74,8 @@ def fastpingpong(input_video: str, *, speed_percent: int = 1000,
 
 def timestretch(input_video: str, *, stretch: float = 2.0, no_pingpong: bool = False,
                 target_fps: int = 60, output: str | None = None) -> str:
+    if stretch <= 0:
+        raise ValueError("stretch must be > 0")
     in_path = Path(to_posix(input_video))
     if not in_path.exists():
         raise FileNotFoundError(input_video)

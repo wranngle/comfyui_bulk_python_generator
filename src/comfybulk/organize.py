@@ -24,6 +24,29 @@ def safe_folder_name(text: str) -> str:
     return s or "unknown_prompt"
 
 
+def _unique_destination(folder: Path, filename: str) -> Path:
+    dest = folder / filename
+    if not dest.exists():
+        return dest
+    stem = dest.stem
+    suffix = dest.suffix
+    for i in range(1, 1000):
+        candidate = folder / f"{stem}_{i}{suffix}"
+        if not candidate.exists():
+            return candidate
+    raise FileExistsError(f"Could not find non-overwriting destination for {dest}")
+
+
+def _move_into_folder(src: Path, folder: Path) -> bool:
+    if not src.exists() or not src.is_file():
+        return False
+    dest = _unique_destination(folder, src.name)
+    if src.resolve() == dest.resolve():
+        return False
+    shutil.move(str(src), str(dest))
+    return True
+
+
 def prompt_key(prompt: str) -> str:
     k = re.sub(r"\s+", " ", prompt.lower().strip())
     return k[:100]
@@ -135,16 +158,14 @@ def organize(favorites_path: str, test_mode: bool = False) -> dict:
             created.append(folder.name)
         for item in lst:
             src = Path(item["path"])
-            if src.exists():
-                shutil.move(str(src), str(folder / src.name))
+            if _move_into_folder(src, folder):
                 moved += 1
 
     if not test_mode:
         # Second pass: try to match remaining PNGs to existing folders.
         for png in (p for p in root.glob("*.png") if p.is_file()):
             target = match_png_to_existing_folder(str(png), str(root))
-            if target:
-                shutil.move(str(png), str(Path(target) / png.name))
+            if target and _move_into_folder(png, Path(target)):
                 moved += 1
 
     return {"groups": len(groups), "created": created, "moved": moved}

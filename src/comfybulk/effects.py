@@ -10,50 +10,54 @@ from .ffmpeg import (FFMPEG, FFPROBE, encode_args, atempo_chain,
 
 # ---------- Glitch negative ----------
 
-def _glitch_events(duration: float) -> list[dict]:
+def _glitch_events(duration: float, rng: random.Random | None = None) -> list[dict]:
     """4-phase exponential buildup matching the PowerShell version."""
+    r = rng or random
     events: list[dict] = []
     t = 2.0
     p1 = duration * 0.3
     while t < p1:
         events.append({"start": t, "duration": 0.05, "intensity": 0.3})
-        t += random.uniform(2.0, 4.0)
+        t += r.uniform(2.0, 4.0)
     p2 = duration * 0.6
     while t < p2:
-        events.append({"start": t, "duration": random.uniform(0.05, 0.15), "intensity": 0.5})
-        t += random.uniform(1.0, 2.5)
+        events.append({"start": t, "duration": r.uniform(0.05, 0.15), "intensity": 0.5})
+        t += r.uniform(1.0, 2.5)
     p3 = duration * 0.85
     while t < p3:
-        events.append({"start": t, "duration": random.uniform(0.1, 0.3), "intensity": 0.7})
-        t += random.uniform(0.3, 1.0)
+        events.append({"start": t, "duration": r.uniform(0.1, 0.3), "intensity": 0.7})
+        t += r.uniform(0.3, 1.0)
     while t < (duration - 0.5):
-        events.append({"start": t, "duration": random.uniform(0.2, 0.5), "intensity": 1.0})
-        t += random.uniform(0.1, 0.3)
+        events.append({"start": t, "duration": r.uniform(0.2, 0.5), "intensity": 1.0})
+        t += r.uniform(0.1, 0.3)
     return events
 
 
 def apply_glitch_negative(input_video: str, dest_folder: str, *, neg_audio: str | None = None,
-                          neg_audio_dir: str | None = None, output_filename: str | None = None) -> str:
+                          neg_audio_dir: str | None = None, output_filename: str | None = None,
+                          rng: random.Random | None = None) -> str:
+    r = rng or random
     if not neg_audio and neg_audio_dir:
         d = Path(to_posix(neg_audio_dir))
         if d.is_dir():
             cands = [p for p in d.iterdir() if p.suffix.lower() in (".mp3", ".flac", ".wav")]
             if cands:
-                neg_audio = str(cands[random.randrange(len(cands))])
+                neg_audio = str(cands[r.randrange(len(cands))])
     if not neg_audio:
         raise RuntimeError(f"No negative audio found (folder={neg_audio_dir})")
 
     duration = probe_duration(input_video)
     has_audio = probe_has_audio(input_video)
-    events = _glitch_events(duration)
+    events = _glitch_events(duration, rng=r)
 
     # Build temp dir + output path
     dest = Path(to_posix(dest_folder))
     temp = dest if dest.name == "temp" else dest / "temp"
     temp.mkdir(parents=True, exist_ok=True)
     if not output_filename:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        output_filename = f"glitch_negative_output_{ts}.mp4"
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        rid = "%06x" % random.randrange(16**6)
+        output_filename = f"glitch_negative_output_{ts}_{rid}.mp4"
     out = temp / output_filename
 
     enable_expr = "+".join(f"between(t,{e['start']:.3f},{e['start']+e['duration']:.3f})" for e in events) or "0"
@@ -65,15 +69,15 @@ def apply_glitch_negative(input_video: str, dest_folder: str, *, neg_audio: str 
     )
     if has_audio:
         af = (
-            f"[0:a]volume=enable='not({enable_expr})':volume=1.0:enable='{enable_expr}':volume=0.2[orig];"
+            f"[0:a]volume='if({enable_expr},0.2,1.0)':eval=frame[orig];"
             f"[1:a]aloop=loop=-1:size=2e+09,atrim=end={duration},"
-            f"volume=enable='{enable_expr}':volume=1.5:enable='not({enable_expr})':volume=0[ga];"
+            f"volume='if({enable_expr},1.5,0)':eval=frame[ga];"
             "[orig][ga]amix=inputs=2:duration=first:dropout_transition=0[aout]"
         )
     else:
         af = (
             f"[1:a]aloop=loop=-1:size=2e+09,atrim=end={duration},"
-            f"volume=enable='{enable_expr}':volume=1.0:enable='not({enable_expr})':volume=0[aout]"
+            f"volume='if({enable_expr},1.0,0)':eval=frame[aout]"
         )
     args = ([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
              "-i", to_win(input_video), "-i", to_win(neg_audio),
@@ -99,15 +103,16 @@ def rainbow_generate(templates_dir: str, *, width: int = 1080, height: int = 192
     cx, cy = width / 2, height / 2
     geq = (
         f"[0:v]geq="
-        f"'r=127.5*(1+sin(2*PI*(mod(atan2(Y-{cy},X-{cx})/(2*PI)+T/4,1)+0))):"
-        f"g=127.5*(1+sin(2*PI*(mod(atan2(Y-{cy},X-{cx})/(2*PI)+T/4,1)+0.333))):"
-        f"b=127.5*(1+sin(2*PI*(mod(atan2(Y-{cy},X-{cx})/(2*PI)+T/4,1)+0.667))):"
-        f"a=if(lt(min(min(X,{width}-X),min(Y,{height}-Y)),{border}),"
-        f"255*pow(1-min(min(X,{width}-X),min(Y,{height}-Y))/{border},3),0)'"
+        f"r='127.5*(1+sin(2*PI*(mod(atan2(Y-{cy},X-{cx})/(2*PI)+T/4,1)+0)))':"
+        f"g='127.5*(1+sin(2*PI*(mod(atan2(Y-{cy},X-{cx})/(2*PI)+T/4,1)+0.333)))':"
+        f"b='127.5*(1+sin(2*PI*(mod(atan2(Y-{cy},X-{cx})/(2*PI)+T/4,1)+0.667)))':"
+        f"a='if(lt(min(min(X,{width}-X),min(Y,{height}-Y)),{border}),"
+        f"255*pow(1-min(min(X,{width}-X),min(Y,{height}-Y))/{border},3),0)'[v]"
     )
     color = f"color=black:s={width}x{height}:d={duration},format=rgba"
     subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
                     "-f", "lavfi", "-i", color, "-filter_complex", geq,
+                    "-map", "[v]",
                     "-c:v", "png", "-pix_fmt", "rgba", to_win(str(out))], check=True)
     return str(out)
 
@@ -117,10 +122,10 @@ def rainbow_apply(input_video: str, output_video: str, templates_dir: str, *, cr
     if not tpath.exists():
         rainbow_generate(templates_dir)
     w, h = probe_dims(input_video)
-    fc = f"[1:v]scale={w}:{h}[scaled];[0:v][scaled]overlay=format=auto:shortest=1"
+    fc = f"[1:v]scale={w}:{h}[scaled];[0:v][scaled]overlay=format=auto:shortest=1[v]"
     subprocess.run([FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
                     "-i", to_win(input_video), "-stream_loop", "-1", "-i", to_win(str(tpath)),
-                    "-filter_complex", fc, "-map", "0:a?",
+                    "-filter_complex", fc, "-map", "[v]", "-map", "0:a?",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", str(crf), "-preset", "fast",
                     "-c:a", "copy", to_win(output_video)], check=True)
     return output_video
@@ -139,7 +144,9 @@ def reverse_ending(input_video: str, dest_folder: str, *, reverse_duration: floa
     dest = Path(to_posix(dest_folder))
     dest.mkdir(parents=True, exist_ok=True)
     if not output_name:
-        output_name = f"reverse_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        rid = "%06x" % random.randrange(16**6)
+        output_name = f"reverse_{ts}_{rid}.mp4"
     out = dest / output_name
 
     args = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y",

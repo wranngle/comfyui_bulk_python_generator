@@ -1,4 +1,4 @@
-import os, shutil, sys, tempfile
+import os, shutil
 from pathlib import Path
 
 import pytest
@@ -24,12 +24,11 @@ def tmp_workdir(tmp_path):
 
 @pytest.fixture(scope="session")
 def real_test_clip() -> str | None:
-    """A small real ComfyUI-generated clip for integration tests."""
-    candidates = [
-        "/mnt/d/ComfyUI/ComfyUI/output/favorites/assemblymaker/old/test_video.mp4",
-        "D:/ComfyUI/ComfyUI/output/favorites/assemblymaker/old/test_video.mp4",
-    ]
-    for c in candidates:
-        if Path(c).exists():
-            return c
+    """A small real ComfyUI-generated clip for integration tests.
+
+    Set COMFYBULK_REAL_TEST_CLIP to opt into tests that need real media.
+    """
+    c = os.environ.get("COMFYBULK_REAL_TEST_CLIP")
+    if c and Path(c).exists():
+        return c
     return None

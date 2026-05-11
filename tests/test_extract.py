@@ -1,12 +1,13 @@
-"""Unit tests for extract.py — seed validation, banned filter, regex, CSV roundtrip."""
+"""Unit tests for extract.py: seed validation, vocabulary cleanup, regex, CSV roundtrip."""
 import csv
 from pathlib import Path
 
 import pytest
 
 from comfybulk.extract import (
-    BANNED, CSV_HEADER, append_to_csv, find_seed_recursive, remove_banned,
-    validate_seed, _seed_from_filename, _prompt_from_escaped_json, _seed_from_jsonstring,
+    CSV_HEADER, DISCOURAGED_TERM_REPLACEMENTS, append_to_csv, find_seed_recursive,
+    remove_banned, validate_seed, _seed_from_filename, _prompt_from_escaped_json,
+    _seed_from_jsonstring,
 )
 
 
@@ -33,7 +34,7 @@ def test_validate_seed_bad(seed):
     assert not validate_seed(seed)
 
 
-# ---- remove_banned ----
+# ---- project vocabulary cleanup ----
 
 @pytest.mark.parametrize("inp,expect", [
     ("a DMT trip with psychedelic ego-death visuals",
@@ -46,9 +47,9 @@ def test_remove_banned(inp, expect):
     assert remove_banned(inp) == expect
 
 
-def test_banned_table_complete():
+def test_discouraged_term_table_complete():
     # Sanity: 4 rules at minimum.
-    assert len(BANNED) >= 4
+    assert len(DISCOURAGED_TERM_REPLACEMENTS) >= 4
 
 
 # ---- find_seed_recursive ----

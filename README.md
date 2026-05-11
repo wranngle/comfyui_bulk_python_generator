@@ -1,8 +1,8 @@
 # comfyui_bulk_python_generator
 
-Bulk post-processing pipeline for ComfyUI-generated video. Selects clips, builds layout variants (grid / montage / single / cta_only), runs ffmpeg effects (glitch, reverse, rainbow border, motion blur), mixes random audio, and fills metadata via a local Ollama LLM.
+Bulk post-processing pipeline for ComfyUI-generated video. Selects clips, builds layout variants (`grid`, `montage`, `single`, `cta_only`), runs ffmpeg effects (glitch, reverse, rainbow border, motion blur), mixes random audio, and can fill metadata via a local Ollama LLM.
 
-Ported from a tangle of PowerShell scripts into a single Python package. Designed to run in WSL while shelling out to Windows `ffmpeg.exe`/`ffprobe.exe` against media on `D:\`.
+Ported from a tangle of PowerShell scripts into a single Python package. The current implementation is opinionated around WSL/Python shelling out to Windows `ffmpeg.exe`/`ffprobe.exe`; do not assume generic Linux/macOS portability.
 
 ## Layout
 
@@ -49,22 +49,25 @@ pip install dist/comfyui_bulk_python_generator-0.1.0-py3-none-any.whl
 
 ```bash
 # full pipeline (one grid output)
-comfybulk pipeline --source D:\\ComfyUI\\ComfyUI\\output\\favorites\\assemblymaker --variant grid
+comfybulk pipeline --source D:\\path\\to\\ComfyUI\\output\\favorites\\assemblymaker --variant grid
 
 # multiple variants and quantities (grid + montage, 3 each)
-comfybulk pipeline --source D:\\... --variant grid --variant montage --quantity 3
+comfybulk pipeline --source D:\\path\\to\\clips --variant grid --variant montage --quantity 3
 
-# clean variant only (no effects stack — like the legacy create_*.ps1 scripts)
-comfybulk pipeline --source D:\\... --variant single --no-effects
+# reproducible clip/CTA/audio selection + manifest file
+comfybulk pipeline --source D:\\path\\to\\clips --variant montage --seed 1234 --write-manifest
+
+# clean variant only (no effects stack)
+comfybulk pipeline --source D:\\path\\to\\clips --variant single --no-effects
 
 # extract metadata only
-comfybulk extract --path D:\\ComfyUI\\ComfyUI\\output\\favorites\\assemblymaker
+comfybulk extract --path D:\\path\\to\\ComfyUI\\output\\favorites\\assemblymaker
 
 # fill empty LLM fields
 comfybulk fill
 
 # organize media by prompt
-comfybulk organize --path D:\\ComfyUI\\ComfyUI\\output\\favorites
+comfybulk organize --path D:\\path\\to\\ComfyUI\\output\\favorites
 
 # standalone effects
 comfybulk glitch --input video.mp4 --output-dir out/
@@ -82,20 +85,28 @@ comfybulk mixaudio --input video.mp4
 
 `grid` (2x2 ping-pong layout) · `montage` (2-3 sequential clips) · `single` (one clip 1080x1920) · `cta_only` (CTA folder pick with caption).
 
-The bulk pipeline applies the full effects stack (glitch → reverse → rainbow → motion blur) by default. With `--no-effects`, the variant is built clean with both *with-CTA* and *without-CTA* outputs (matches what the legacy `create_*` PowerShell scripts did).
+The bulk pipeline applies the full effects stack (glitch -> reverse -> rainbow -> motion blur) by default. With `--no-effects`, `single`, `montage`, and `cta_only` use the clean builders and may produce CTA/no-CTA outputs. `grid --no-effects` produces a raw grid output.
+
+## Behavior notes
+
+- `pipeline` does not move your source library by default. Pass `--organize` only when you explicitly want a best-effort `organize(cfg.paths.favorites_root)` pre-step.
+- `comfybulk organize --path ...` moves root-level MP4 files into prompt-named folders based on ffprobe `comment` metadata. PNG companions are matched by seed, model family, or base filename pattern. There is intentionally no filename-only prompt fallback.
+- ComfyUI generation seeds are extracted, validated, and written to metadata for matching/renaming. They are separate from the pipeline RNG seed.
+- Clip selection, montage size, CTA/caption/audio choices, and other pipeline random choices can be seeded with `--seed`.
+- `--write-manifest` appends run metadata to `finals/pipeline_manifest.jsonl`; without it, manifest details are printed only.
 
 ## Requirements
 
-- WSL (Ubuntu) with Python 3.10+
-- Windows `ffmpeg.exe` and `ffprobe.exe` on PATH (accessible from WSL)
-- Ollama running on `localhost:11434` with model `josiefied-qwen3-8b:latest` (auto-launches if installed)
-- Source media + `audio/` + `CTA/` folders on `D:\` (or any reachable path)
+- Python 3.10+
+- Windows `ffmpeg.exe` and `ffprobe.exe` on PATH when using the WSL-oriented workflow
+- A `config.toml` copied from `config.example.toml` with paths for source media, `audio/`, `CTA/`, templates, and metadata CSV
+- Ollama on `localhost:11434` only for `fill` and the full pipeline's best-effort metadata fill. Auto-launch is opt-in via `comfybulk fill --auto-launch-ollama`, `ollama.auto_launch = true`, or `COMFYBULK_AUTO_LAUNCH_OLLAMA=1`.
 
 ## Testing
 
 ```bash
-pytest                       # unit tests only
-pytest -m integration        # also runs end-to-end against real media on D:\
+pytest                       # unit tests; integration is excluded by default
+COMFYBULK_REAL_TEST_CLIP=/path/to/clip.mp4 pytest -m integration
 ```
 
 ## License

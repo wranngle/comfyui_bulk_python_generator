@@ -11,8 +11,12 @@ pip install -e .[dev]
 
 ```bash
 pytest                       # unit tests
-pytest -m integration        # end-to-end (needs real media on D:\)
+COMFYBULK_REAL_TEST_CLIP=/path/to/clip.mp4 pytest -m integration
 ```
+
+Integration tests are opt-in and require a real media file plus ffmpeg/ffprobe.
+When using Windows ffmpeg.exe from WSL, set COMFYBULK_INTEGRATION_TMP to a
+Windows-visible scratch directory if the repo checkout is not visible to ffmpeg.
 
 ## Style
 

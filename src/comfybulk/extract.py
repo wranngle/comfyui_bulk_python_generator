@@ -1,16 +1,16 @@
 """ComfyUI metadata extraction (PNG/MP4 → metadata.csv).
 
-Ports Extract-ComfyUIPrompt.ps1 verbatim:
+Ports Extract-ComfyUIPrompt.ps1 behavior:
 - Strict seed validation (10+ digits, 3+ unique, ≤60% repetition).
 - Recursive seed search across nested JSON.
 - Multiple prompt-extraction strategies (workflow.nodes, prompt nodes, escaped JSON, tEXt chunk).
-- Banned-term filter applied before save.
+- Project vocabulary substitutions applied before save.
 - MP4→PNG sibling fallback.
 - File priority MP4 > AVI > WEBM > PNG for same base name.
 - Append to metadata.csv with prompt+seed+clipname duplicate check + 3x retry on lock.
 """
 from __future__ import annotations
-import csv, json, re, time
+import csv, json, os, re, tempfile, time
 from collections import Counter
 from pathlib import Path
 
@@ -19,20 +19,30 @@ from .ffmpeg import probe_format_tag, to_posix
 CSV_HEADER = ["filename", "seed", "content_prompt", "clipname", "caption",
               "title", "description", "tags", "cover_text", "pinned_comment", "CTA"]
 
-BANNED = [
+DISCOURAGED_TERM_REPLACEMENTS = [
     (re.compile(r"\bDMT\b", re.I), "visionary"),
     (re.compile(r"\bpsychedelic\b", re.I), "abstract"),
     (re.compile(r"\btrip\b", re.I), "journey"),
     (re.compile(r"\bego-death\b", re.I), "transcendent"),
 ]
+BANNED = DISCOURAGED_TERM_REPLACEMENTS
+
+
+def replace_discouraged_terms(text: str) -> str:
+    """Apply project-specific vocabulary substitutions.
+
+    This is metadata style cleanup, not safety moderation.
+    """
+    if not text:
+        return text
+    for pat, repl in DISCOURAGED_TERM_REPLACEMENTS:
+        text = pat.sub(repl, text)
+    return text
 
 
 def remove_banned(text: str) -> str:
-    if not text:
-        return text
-    for pat, repl in BANNED:
-        text = pat.sub(repl, text)
-    return text
+    """Compatibility wrapper for older callers."""
+    return replace_discouraged_terms(text)
 
 
 def validate_seed(s: str) -> bool:
@@ -212,17 +222,30 @@ def _csv_read(csv_path: str, retries: int = 3, wait: int = 20):
 
 def _csv_write(csv_path: str, rows: list[dict], retries: int = 3, wait: int = 20):
     last = None
-    posix = to_posix(csv_path)
+    target = Path(to_posix(csv_path))
     for i in range(retries):
+        tmp_path = None
         try:
-            with open(posix, "w", encoding="utf-8", newline="") as f:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                newline="",
+                dir=str(target.parent),
+                prefix=f".{target.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as f:
+                tmp_path = Path(f.name)
                 w = csv.DictWriter(f, fieldnames=CSV_HEADER, quoting=csv.QUOTE_ALL)
                 w.writeheader()
                 for r in rows:
                     w.writerow({k: r.get(k, "") for k in CSV_HEADER})
+            os.replace(tmp_path, target)
             return
         except (OSError, IOError) as e:
             last = e
+            if tmp_path:
+                tmp_path.unlink(missing_ok=True)
             if i < retries - 1:
                 time.sleep(wait)
     raise RuntimeError(f"Failed to write CSV after {retries} attempts: {last}")
@@ -232,18 +255,17 @@ def append_to_csv(prompt: str, seed: str, source_file: str, csv_path: str) -> bo
     """Append a row. Returns False if exact (prompt, seed, clipname) duplicate exists."""
     posix = to_posix(csv_path)
     if not Path(posix).exists():
-        with open(posix, "w", encoding="utf-8-sig", newline="") as f:
-            csv.writer(f).writerow(CSV_HEADER)
+        _csv_write(csv_path, [])
     rows = _csv_read(csv_path)
-    for r in rows:
-        if r.get("content_prompt") == prompt and r.get("seed") == seed and r.get("clipname") == source_file:
-            return False
-    cleaned = remove_banned(prompt)
+    cleaned = replace_discouraged_terms(prompt)
     fmt_seed = ""
     try:
         fmt_seed = str(int(float(seed)))
     except (ValueError, TypeError):
         fmt_seed = seed
+    for r in rows:
+        if r.get("content_prompt") == cleaned and r.get("seed") == fmt_seed and r.get("clipname") == source_file:
+            return False
     rows.append({"filename": "", "seed": fmt_seed, "content_prompt": cleaned,
                  "clipname": source_file, "caption": "", "title": "", "description": "",
                  "tags": "", "cover_text": "", "pinned_comment": "", "CTA": ""})

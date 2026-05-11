@@ -1,22 +1,31 @@
-# Paths are stored Windows-style (D:\...) because they're passed to Windows ffmpeg.exe.
-# Python file IO converts to /mnt/d/... via comfybulk.ffmpeg.to_posix() when needed.
+# Copy this file to config.toml and replace every D:\path\to\... value.
+#
+# This project is currently opinionated around WSL/Python calling Windows
+# ffmpeg.exe/ffprobe.exe. Keep media/tool paths in Windows form when they are
+# passed to ffmpeg; Python file IO converts them to /mnt/<drive>/... as needed.
+# Plain POSIX paths can work for files that both Python and ffmpeg can see, but
+# that is not the primary supported setup.
 
 [paths]
-assembly_root  = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker'
-favorites_root = 'D:\ComfyUI\ComfyUI\output\favorites'
-audio_folder   = 'D:\ComfyUI\ComfyUI\output\favorites\audio'
-neg_audio      = 'D:\ComfyUI\ComfyUI\output\favorites\audio\negatives'
-cta_folder     = 'D:\ComfyUI\ComfyUI\output\favorites\CTA'
-templates      = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker\templates'
-metadata_csv   = 'D:\ComfyUI\ComfyUI\output\favorites\assemblymaker\metadata.csv'
-# These two ship inside the package (importlib.resources) — only set to override:
+assembly_root  = 'D:\path\to\ComfyUI\output\favorites\assemblymaker'
+favorites_root = 'D:\path\to\ComfyUI\output\favorites'
+audio_folder   = 'D:\path\to\ComfyUI\output\favorites\audio'
+neg_audio      = 'D:\path\to\ComfyUI\output\favorites\audio\negatives'
+cta_folder     = 'D:\path\to\ComfyUI\output\favorites\CTA'
+templates      = 'D:\path\to\ComfyUI\output\favorites\assemblymaker\templates'
+metadata_csv   = 'D:\path\to\ComfyUI\output\favorites\assemblymaker\metadata.csv'
+# These two ship inside the package via importlib.resources; only set to override.
 # ai_prompts_csv = '/path/to/your/ai_metadata_prompts.csv'
 # captions_csv   = '/path/to/your/captions.csv'
 
 [ollama]
 host  = 'http://localhost:11434'
-model = 'josiefied-qwen3-8b:latest'
-gguf_path = 'D:\ComfyUI\.ollama\models\Josiefied-Qwen3-8B-abliterated-v1.Q6_K.gguf'
+model = 'your-local-model:latest'
+# Required by the current config schema. Use the local model file path if your
+# fill workflow creates a model from a GGUF; otherwise keep a harmless placeholder.
+gguf_path = 'D:\path\to\ollama\models\your-local-model.gguf'
+# Default false: do not start background services unless explicitly requested.
+auto_launch = false
 
 [encode]
 crf      = 18
