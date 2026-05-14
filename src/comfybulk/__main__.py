@@ -34,6 +34,18 @@ def cmd_extract(a):
         sys.exit(1)
 
 
+def cmd_images(a):
+    from .images import process_directory
+    cfg = load(Path(a.config) if a.config else None)
+    csv_path = a.csv or cfg.paths.metadata_csv
+    p = Path(a.path)
+    if not p.is_dir():
+        print(f"Not a directory: {a.path}", file=sys.stderr)
+        sys.exit(1)
+    ok, fail = process_directory(str(p), csv_path, test_mode=a.test_mode)
+    print(f"Images: {ok} row(s) written, {fail} failed")
+
+
 def cmd_fill(a):
     from .fill import fill
     cfg = load(Path(a.config) if a.config else None)
@@ -137,6 +149,12 @@ def main():
     sp.add_argument("--csv", help="Override metadata.csv path")
     sp.add_argument("--test-mode", action="store_true", help="Don't write to CSV")
     sp.set_defaults(func=cmd_extract)
+
+    sp = sub.add_parser("images", help="Bulk-process a directory of PNG/JPG images into metadata.csv")
+    sp.add_argument("path", help="Directory of images (recursive). Non-image files are skipped.")
+    sp.add_argument("--csv", help="Override metadata.csv path")
+    sp.add_argument("--test-mode", action="store_true", help="Count rows but don't write CSV")
+    sp.set_defaults(func=cmd_images)
 
     sp = sub.add_parser("fill", help="Fill empty LLM-generated CSV fields via Ollama")
     sp.add_argument("--auto-launch-ollama", action="store_true",
