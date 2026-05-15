@@ -4,6 +4,20 @@ Bulk post-processing pipeline for ComfyUI-generated video. Selects clips, builds
 
 Ported from a tangle of PowerShell scripts into a single Python package. The current implementation is opinionated around WSL/Python shelling out to Windows `ffmpeg.exe`/`ffprobe.exe`; do not assume generic Linux/macOS portability.
 
+## Quickstart (60-second First User Moment)
+
+No ComfyUI, no ffmpeg, no `config.toml` — just the bundled fixture clips at `tests/fixtures/samples/`. Verifies metadata extraction works end-to-end on a fresh clone.
+
+```bash
+git clone https://github.com/wranngle/comfyui_bulk_python_generator.git && cd comfyui_bulk_python_generator
+python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+cp -r tests/fixtures/samples /tmp/comfybulk-quickstart && cd /tmp/comfybulk-quickstart
+python3 -c "from comfybulk.extract import process_directory; ok, fail = process_directory('.', 'metadata.csv', test_mode=False); print(f'{ok} extracted, {fail} failed')"
+head -n 4 metadata.csv
+```
+
+Expected: `3 extracted, 0 failed` and a 4-line `metadata.csv` (header + one row per fixture clip). From here, point the full pipeline at your own ComfyUI output directory — see [Run](#run).
+
 ## Layout
 
 ```
