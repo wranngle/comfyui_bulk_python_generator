@@ -123,6 +123,21 @@ def cmd_convert(a):
     print(f"Output: {out}")
 
 
+def cmd_export(a):
+    if a.target != "shopify":
+        print(f"Unknown export target: {a.target}", file=sys.stderr)
+        sys.exit(2)
+    from .export.shopify import ShopifyDefaults, asset_count, export_shopify_csv
+    defaults = ShopifyDefaults(
+        vendor=a.vendor,
+        product_type=a.product_type,
+        price=a.price,
+    )
+    n = export_shopify_csv(a.manifest, a.output, defaults=defaults)
+    expected = asset_count(a.manifest)
+    print(f"Wrote {n} row(s) to {a.output} (manifest assets: {expected})")
+
+
 def main():
     p = argparse.ArgumentParser(prog="comfybulk", description="ComfyUI bulk media pipeline")
     p.add_argument("--config", help="Path to config.toml (default: search ./, repo root, $COMFYBULK_CONFIG)")
@@ -224,6 +239,15 @@ def main():
     sp.add_argument("--duration", type=float, default=5.0, help="WebP only")
     sp.add_argument("--fps", type=int, default=30, help="WebP only")
     sp.set_defaults(func=cmd_convert)
+
+    sp = sub.add_parser("export", help="Export pipeline outputs into downstream surfaces (Shopify)")
+    sp.add_argument("--target", choices=["shopify"], default="shopify")
+    sp.add_argument("--manifest", required=True, help="Path to finals/pipeline_manifest.jsonl")
+    sp.add_argument("--output", required=True, help="Destination CSV path")
+    sp.add_argument("--vendor", default="Wranngle")
+    sp.add_argument("--product-type", default="Generative Video")
+    sp.add_argument("--price", default="0.00")
+    sp.set_defaults(func=cmd_export)
 
     a = p.parse_args()
     a.func(a)
