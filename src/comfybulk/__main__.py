@@ -12,7 +12,8 @@ def cmd_pipeline(a):
     outs = run(a.variant, a.source, quantity=a.quantity, cfg=cfg,
                audio_source=a.audio_source, reversal_speed=a.reversal_speed,
                no_effects=a.no_effects, organize_favorites=a.organize,
-               seed=a.seed, write_manifest=a.write_manifest)
+               seed=a.seed, write_manifest=a.write_manifest,
+               resume=a.resume, checkpoint_dir=a.checkpoint_dir)
     print(f"\n=== Generated {len(outs)} output(s) ===")
     for o in outs:
         print(f"  {o}")
@@ -130,6 +131,10 @@ def main():
                     help="Seed pipeline clip/CTA/audio choices for reproducible selection")
     sp.add_argument("--write-manifest", action="store_true",
                     help="Append run metadata to finals/pipeline_manifest.jsonl")
+    sp.add_argument("--resume", action="store_true",
+                    help="Skip iterations already recorded in the checkpoint ledger")
+    sp.add_argument("--checkpoint-dir", default=None,
+                    help="Directory holding .comfybulk-checkpoint.jsonl (default: source folder)")
     sp.set_defaults(func=cmd_pipeline)
 
     sp = sub.add_parser("extract", help="Extract ComfyUI metadata into metadata.csv")

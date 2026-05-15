@@ -15,6 +15,7 @@ from pathlib import Path
 
 from .config import Config
 from . import effects, variants, fill as fill_mod
+from .checkpoint import Checkpoint
 from .extract import process_file as extract_one
 from .ffmpeg import (FFMPEG, FFPROBE, atempo_chain, encode_args,
                      concat_file_line, drawtext_filter, probe_duration,
@@ -430,21 +431,38 @@ def run_one(variant: str, source: str, cfg: Config, *, audio_source: str | None 
     return [str(final_out)]
 
 
+def _checkpoint_base(source: str) -> Path:
+    src = Path(to_posix(source))
+    return src.parent if src.is_file() else src
+
+
 def run(variants_list: list[str], source: str, *, quantity: int = 1, cfg: Config | None = None,
         audio_source: str | None = None, reversal_speed: float = 4.0,
         no_effects: bool = False, organize_favorites: bool = False,
-        seed: int | None = None, write_manifest: bool = False) -> list[str]:
+        seed: int | None = None, write_manifest: bool = False,
+        resume: bool = False, checkpoint_dir: str | None = None) -> list[str]:
     if cfg is None:
         from .config import load
         cfg = load()
+    ckpt_root = Path(checkpoint_dir) if checkpoint_dir else _checkpoint_base(source)
+    ckpt = Checkpoint.for_dir(ckpt_root).start_run(
+        source=source, variants=variants_list, quantity=quantity, resume=resume,
+    )
+    if resume and ckpt.processed:
+        print(f"[RESUME] skipping {len(ckpt.processed)} already-processed iteration(s) "
+              f"(ledger: {ckpt.path})")
     all_outputs: list[str] = []
     for v in variants_list:
         for i in range(quantity):
+            if ckpt.is_processed(v, i):
+                print(f"[RESUME] skip {v} {i+1}/{quantity} (already done)")
+                continue
             print(f"\n=== {v} {i+1}/{quantity} ===")
             run_seed = _derive_iteration_seed(int(seed), v, i) if seed is not None else None
             outs = run_one(v, source, cfg, audio_source=audio_source,
                            reversal_speed=reversal_speed, no_effects=no_effects,
                            organize_favorites=organize_favorites, seed=run_seed,
                            write_manifest=write_manifest)
+            ckpt.mark_processed(v, i, outputs=outs)
             all_outputs.extend(outs)
     return all_outputs
