@@ -32,6 +32,7 @@ src/comfybulk/
 ├── variants.py   # grid (2x2), montage, single, cta_only
 ├── tools.py      # fastpingpong, timestretch, convert (webp/webm → mp4)
 ├── pipeline.py   # bulk orchestrator (entry point of the pipeline)
+├── checkpoint/   # resume-on-failure JSONL ledger
 ├── __main__.py   # CLI: `comfybulk <subcommand>`
 └── data/         # bundled with the package via importlib.resources
     ├── ai_metadata_prompts.csv  # LLM prompt templates per metadata field
@@ -71,6 +72,9 @@ comfybulk pipeline --source D:\\path\\to\\clips --variant grid --variant montage
 # reproducible clip/CTA/audio selection + manifest file
 comfybulk pipeline --source D:\\path\\to\\clips --variant montage --seed 1234 --write-manifest
 
+# resume an interrupted batch (skips iterations already in .comfybulk-checkpoint.jsonl)
+comfybulk pipeline --source D:\\path\\to\\clips --variant single --quantity 50 --resume
+
 # clean variant only (no effects stack)
 comfybulk pipeline --source D:\\path\\to\\clips --variant single --no-effects
 
@@ -108,6 +112,7 @@ The bulk pipeline applies the full effects stack (glitch -> reverse -> rainbow -
 - ComfyUI generation seeds are extracted, validated, and written to metadata for matching/renaming. They are separate from the pipeline RNG seed.
 - Clip selection, montage size, CTA/caption/audio choices, and other pipeline random choices can be seeded with `--seed`.
 - `--write-manifest` appends run metadata to `finals/pipeline_manifest.jsonl`; without it, manifest details are printed only.
+- `--resume` reads `<source>/.comfybulk-checkpoint.jsonl` and skips any `(variant, iteration)` already marked complete; mid-batch failures (Ctrl-C, ffmpeg crash, network blip during fill) can be replayed without redoing finished work. Override the ledger location with `--checkpoint-dir`.
 
 ## Requirements
 
