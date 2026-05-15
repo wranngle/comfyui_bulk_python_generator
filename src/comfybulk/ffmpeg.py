@@ -1,17 +1,36 @@
 """ffmpeg/ffprobe subprocess wrappers + WSL↔Windows path conversion."""
 from __future__ import annotations
-import math, os, shutil, subprocess, sys
+import math, os, platform, shutil, subprocess, sys
 from pathlib import Path
 
 FFMPEG = "ffmpeg.exe" if shutil.which("ffmpeg.exe") else "ffmpeg"
 FFPROBE = "ffprobe.exe" if shutil.which("ffprobe.exe") else "ffprobe"
 
 
+def _is_wsl() -> bool:
+    """True only when running under WSL. Plain Linux and macOS return False."""
+    if platform.system() != "Linux":
+        return False
+    try:
+        with open("/proc/version", "r") as fh:
+            kernel = fh.read().lower()
+    except OSError:
+        return False
+    return "microsoft" in kernel or "wsl" in kernel
+
+
 def to_win(p: str | Path) -> str:
-    """Path string suitable for ffmpeg.exe (Windows form)."""
+    """Path string suitable for ffmpeg.exe (Windows form).
+
+    On native Windows: normalise slashes. On WSL: rewrite `/mnt/<drive>/...`
+    into `<DRIVE>:\\...`. On plain Linux / macOS: return the input unchanged
+    so the package no longer hard-fails outside WSL.
+    """
     s = str(p)
     if sys.platform == "win32":
         return s.replace("/", "\\")
+    if not _is_wsl():
+        return s
     if s.startswith("/mnt/") and len(s) >= 7 and s[5].isalpha() and s[6] == "/":
         return f"{s[5].upper()}:" + s[6:].replace("/", "\\")
     if len(s) == 6 and s.startswith("/mnt/") and s[5].isalpha():
@@ -20,9 +39,16 @@ def to_win(p: str | Path) -> str:
 
 
 def to_posix(p: str | Path) -> str:
-    """Path string suitable for Python open()/exists() in WSL."""
+    """Path string suitable for Python open()/exists().
+
+    On native Windows: pass through. On WSL: rewrite `<DRIVE>:\\...` into
+    `/mnt/<drive>/...`. On plain Linux / macOS: pass through; bare Windows-
+    style paths have no meaning there and converting them would invent state.
+    """
     s = str(p)
     if sys.platform == "win32":
+        return s
+    if not _is_wsl():
         return s
     if len(s) >= 2 and s[1] == ":":
         rest = s[2:].replace("\\", "/")
