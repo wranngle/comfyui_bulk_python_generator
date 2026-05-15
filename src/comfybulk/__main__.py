@@ -138,6 +138,18 @@ def cmd_export(a):
     print(f"Wrote {n} row(s) to {a.output} (manifest assets: {expected})")
 
 
+def cmd_dash(a):
+    from .cli.dash import main as dash_main
+    argv: list[str] = []
+    if a.manifest:
+        argv += ["--manifest", a.manifest]
+    if a.demo:
+        argv += ["--demo"]
+    argv += ["--host", a.host, "--port", str(a.port)]
+    argv += ["--demo-total", str(a.demo_total), "--demo-interval", str(a.demo_interval)]
+    sys.exit(dash_main(argv))
+
+
 def main():
     p = argparse.ArgumentParser(prog="comfybulk", description="ComfyUI bulk media pipeline")
     p.add_argument("--config", help="Path to config.toml (default: search ./, repo root, $COMFYBULK_CONFIG)")
@@ -248,6 +260,18 @@ def main():
     sp.add_argument("--product-type", default="Generative Video")
     sp.add_argument("--price", default="0.00")
     sp.set_defaults(func=cmd_export)
+
+    sp = sub.add_parser("dash", help="Serve progress dashboard HTTP UI")
+    src = sp.add_mutually_exclusive_group(required=True)
+    src.add_argument("--manifest", help="Tail finals/pipeline_manifest.jsonl")
+    src.add_argument("--demo", action="store_true",
+                     help="Run synthetic in-memory progress ticker")
+    sp.add_argument("--host", default="127.0.0.1")
+    sp.add_argument("--port", type=int, default=0,
+                    help="Bind port (default 0 = ephemeral; printed on start)")
+    sp.add_argument("--demo-total", type=int, default=10)
+    sp.add_argument("--demo-interval", type=float, default=1.0)
+    sp.set_defaults(func=cmd_dash)
 
     a = p.parse_args()
     a.func(a)
