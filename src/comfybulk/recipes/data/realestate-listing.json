@@ -1,0 +1,17 @@
+{
+  "name": "realestate-listing",
+  "description": "Wide-angle 16:9 landscape with light correction for real-estate listings.",
+  "kind": "image",
+  "ops": [
+    {"op": "crop", "mode": "aspect", "aspect": "16:9"},
+    {"op": "resize", "width": 1920, "height": 1080},
+    {"op": "light_correct", "exposure": 0.15, "white_balance": "auto"},
+    {"op": "encode", "format": "jpg", "quality": 92}
+  ],
+  "output_suffix": "_listing",
+  "dispatch": {
+    "subcommand": "images",
+    "router": "localllm",
+    "fallback": "passthrough"
+  }
+}

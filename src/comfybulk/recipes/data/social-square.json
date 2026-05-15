@@ -1,0 +1,17 @@
+{
+  "name": "social-square",
+  "description": "Square 1080x1080 social post with bottom-right brand watermark.",
+  "kind": "image",
+  "ops": [
+    {"op": "crop", "mode": "center-square"},
+    {"op": "resize", "width": 1080, "height": 1080},
+    {"op": "watermark", "position": "bottom-right", "opacity": 0.7, "asset": "brand"},
+    {"op": "encode", "format": "png", "quality": 95}
+  ],
+  "output_suffix": "_social",
+  "dispatch": {
+    "subcommand": "images",
+    "router": "localllm",
+    "fallback": "passthrough"
+  }
+}

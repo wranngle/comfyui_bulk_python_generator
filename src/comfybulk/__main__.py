@@ -127,6 +127,9 @@ def main():
     p.add_argument("--config", help="Path to config.toml (default: search ./, repo root, $COMFYBULK_CONFIG)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    from .cli.recipes import add_subparser as _add_recipes
+    _add_recipes(sub)
+
     sp = sub.add_parser("pipeline", help="Full bulk processing pipeline")
     sp.add_argument("--source", required=True, help="Source folder OR specific .mp4 file")
     sp.add_argument("--variant", choices=["grid", "montage", "single", "cta_only"],
