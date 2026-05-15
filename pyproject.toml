@@ -39,7 +39,7 @@ comfybulk = "comfybulk.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-comfybulk = ["data/*.csv", "py.typed"]
+comfybulk = ["data/*.csv", "py.typed", "recipes/data/*.json", "recipes/data/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

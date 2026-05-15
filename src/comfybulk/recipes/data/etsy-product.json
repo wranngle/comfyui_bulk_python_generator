@@ -1,0 +1,17 @@
+{
+  "name": "etsy-product",
+  "description": "Square 1000x1000 product crop on white background for Etsy listings.",
+  "kind": "image",
+  "ops": [
+    {"op": "crop", "mode": "center-square"},
+    {"op": "resize", "width": 1000, "height": 1000},
+    {"op": "background", "color": "#ffffff"},
+    {"op": "encode", "format": "png", "quality": 95}
+  ],
+  "output_suffix": "_etsy",
+  "dispatch": {
+    "subcommand": "images",
+    "router": "localllm",
+    "fallback": "passthrough"
+  }
+}
