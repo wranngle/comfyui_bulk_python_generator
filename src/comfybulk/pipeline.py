@@ -14,13 +14,46 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import Config
-from . import effects, variants, fill as fill_mod, provenance
+from . import effects, variants, fill as fill_mod, provenance, ledger as ledger_mod
 from .checkpoint import Checkpoint
 from .extract import process_file as extract_one
 from .ffmpeg import (FFMPEG, FFPROBE, atempo_chain, encode_args,
                      concat_file_line, drawtext_filter, probe_duration,
                      probe_format_tag, to_posix, to_win)
 from .organize import organize
+
+
+DEFAULT_MODEL_VERSION = "comfybulk-pipeline/0.1.0"
+
+
+def _emit_ledger(*, finals: Path, clips: list[Path], outputs: list[str],
+                 variant: str, seed: int, no_effects: bool, cfg: Config,
+                 reversal_speed: float | None) -> None:
+    """Best-effort: append one ledger entry per bulk operation. Never raises."""
+    try:
+        recipe = {
+            "variant": variant,
+            "no_effects": bool(no_effects),
+            "seed": int(seed),
+            "encode": {
+                "crf": cfg.encode.crf,
+                "preset": cfg.encode.preset,
+                "target_w": cfg.encode.target_w,
+                "target_h": cfg.encode.target_h,
+                "fps": cfg.encode.fps,
+            },
+        }
+        if reversal_speed is not None:
+            recipe["reversal_speed"] = float(reversal_speed)
+        ledger_mod.record_run(
+            finals,
+            inputs=[str(c) for c in clips],
+            outputs=outputs,
+            recipe=recipe,
+            model_version=DEFAULT_MODEL_VERSION,
+        )
+    except Exception as e:
+        print(f"[LEDGER] skipped: {e}")
 
 
 _WINDOWS_RESERVED_NAMES = {
@@ -393,6 +426,8 @@ def run_one(variant: str, source: str, cfg: Config, *, audio_source: str | None 
         }, enabled=write_manifest)
         _emit_provenance(outs, variant=variant, run_seed=run_seed, ts=ts,
                          clips=clips, no_effects=True)
+        _emit_ledger(finals=finals, clips=clips, outputs=outs, variant=variant,
+                     seed=run_seed, no_effects=True, cfg=cfg, reversal_speed=None)
         return outs
 
     # Full effects pipeline
@@ -447,6 +482,8 @@ def run_one(variant: str, source: str, cfg: Config, *, audio_source: str | None 
     }, enabled=write_manifest)
     _emit_provenance([str(final_out)], variant=variant, run_seed=run_seed, ts=ts,
                      clips=clips, no_effects=False)
+    _emit_ledger(finals=finals, clips=clips, outputs=[str(final_out)], variant=variant,
+                 seed=run_seed, no_effects=False, cfg=cfg, reversal_speed=reversal_speed)
     return [str(final_out)]
 
 
