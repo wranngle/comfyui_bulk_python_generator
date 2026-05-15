@@ -15,6 +15,7 @@ import requests
 from .config import Config
 from .extract import replace_discouraged_terms
 from .ffmpeg import to_posix
+from .llm import LocalLLM
 
 
 SHORT_FIELDS = {"cover_text", "caption"}
@@ -136,15 +137,15 @@ def _clean_response(txt: str) -> str:
 
 
 def ollama_generate(cfg: Config, prompt: str, *, temp: float, top_p: float, repeat_penalty: float, num_predict: int = 200) -> str:
-    body = {
-        "model": cfg.ollama.model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": temp, "top_p": top_p, "repeat_penalty": repeat_penalty, "num_predict": num_predict},
-    }
-    r = requests.post(f"{cfg.ollama.host}/api/generate", json=body, timeout=600)
-    r.raise_for_status()
-    return _clean_response(r.json().get("response", ""))
+    llm = LocalLLM(backend="ollama", host=cfg.ollama.host, model=cfg.ollama.model)
+    raw = llm.generate(
+        prompt,
+        temperature=temp,
+        top_p=top_p,
+        repeat_penalty=repeat_penalty,
+        num_predict=num_predict,
+    )
+    return _clean_response(raw)
 
 
 def _canonical_generated_value(value: str) -> str:
