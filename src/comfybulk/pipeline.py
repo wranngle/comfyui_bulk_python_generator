@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import Config
-from . import effects, variants, fill as fill_mod
+from . import effects, variants, fill as fill_mod, provenance
 from .checkpoint import Checkpoint
 from .extract import process_file as extract_one
 from .ffmpeg import (FFMPEG, FFPROBE, atempo_chain, encode_args,
@@ -302,6 +302,21 @@ def _write_manifest(finals: Path, entry: dict, enabled: bool = True) -> None:
         f.write(line + "\n")
 
 
+def _emit_provenance(outs: list[str], *, variant: str, run_seed: int, ts: str,
+                     clips: list[Path], no_effects: bool) -> None:
+    """Write a sha256 sidecar next to each output. Best-effort; never fatal."""
+    try:
+        provenance.write_sidecars(outs, context={
+            "variant": variant,
+            "seed": run_seed,
+            "timestamp": ts,
+            "clips": [c.name for c in clips],
+            "no_effects": no_effects,
+        })
+    except Exception as e:
+        print(f"[PROVENANCE] skipped: {e}")
+
+
 def run_one(variant: str, source: str, cfg: Config, *, audio_source: str | None = None,
             reversal_speed: float = 4.0, no_effects: bool = False,
             organize_favorites: bool = False, seed: int | None = None,
@@ -376,6 +391,8 @@ def run_one(variant: str, source: str, cfg: Config, *, audio_source: str | None 
             "no_effects": True,
             "organize_favorites": organize_favorites,
         }, enabled=write_manifest)
+        _emit_provenance(outs, variant=variant, run_seed=run_seed, ts=ts,
+                         clips=clips, no_effects=True)
         return outs
 
     # Full effects pipeline
@@ -428,6 +445,8 @@ def run_one(variant: str, source: str, cfg: Config, *, audio_source: str | None 
         "audio_source": audio_source,
         "reversal_speed": reversal_speed,
     }, enabled=write_manifest)
+    _emit_provenance([str(final_out)], variant=variant, run_seed=run_seed, ts=ts,
+                     clips=clips, no_effects=False)
     return [str(final_out)]
 
 
