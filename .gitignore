@@ -27,3 +27,6 @@ config.toml
 *.tmp
 *.log
 node_modules/
+
+# git-awesome runtime state (autostash patches, event ledger, baselines)
+.artifacts/
