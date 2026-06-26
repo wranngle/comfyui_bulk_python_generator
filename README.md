@@ -6,7 +6,7 @@ Ported from a tangle of PowerShell scripts into a single Python package. The cur
 
 ## Quickstart (60-second First User Moment)
 
-No ComfyUI, no ffmpeg, no `config.toml` — just the bundled fixture clips at `tests/fixtures/samples/`. Verifies metadata extraction works end-to-end on a fresh clone.
+No ComfyUI and no config.toml required; needs ffprobe on PATH. Just the bundled fixture clips at `tests/fixtures/samples/`. Verifies metadata extraction works end-to-end on a fresh clone.
 
 ```bash
 git clone https://github.com/wranngle/comfyui_bulk_python_generator.git && cd comfyui_bulk_python_generator
@@ -16,7 +16,7 @@ python3 -c "from comfybulk.extract import process_directory; ok, fail = process_
 head -n 4 metadata.csv
 ```
 
-Expected: `3 extracted, 0 failed` and a 4-line `metadata.csv` (header + one row per fixture clip). From here, point the full pipeline at your own ComfyUI output directory — see [Run](#run).
+Expected: `3 extracted, 0 failed` and a 4-line `metadata.csv` (header + one row per fixture clip). From here, point the full pipeline at your own ComfyUI output directory; see [Run](#run).
 
 ## Layout
 
@@ -38,7 +38,7 @@ src/comfybulk/
     ├── ai_metadata_prompts.csv  # LLM prompt templates per metadata field
     └── captions.csv             # CTA caption strings
 
-config.example.toml              # template — copy to config.toml + edit paths
+config.example.toml              # template: copy to config.toml + edit paths
 ```
 
 ## Install
@@ -130,4 +130,4 @@ COMFYBULK_REAL_TEST_CLIP=/path/to/clip.mp4 pytest -m integration
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
