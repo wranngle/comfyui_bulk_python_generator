@@ -27,7 +27,7 @@ src/comfybulk/
 ├── extract.py    # ComfyUI metadata extraction (PNG/MP4 → metadata.csv)
 ├── fill.py       # Ollama LLM fills empty CSV fields
 ├── organize.py   # group media files by prompt into subfolders
-├── effects.py    # glitch_negative, rainbow_overlay, reverse_ending
+├── effects.py    # apply_glitch_negative, rainbow_apply/rainbow_generate, reverse_ending
 ├── audio.py      # random audio mix with time-stretch + loudnorm
 ├── variants.py   # grid (2x2), montage, single, cta_only
 ├── tools.py      # fastpingpong, timestretch, convert (webp/webm → mp4)
