@@ -23,7 +23,7 @@ Expected: `3 extracted, 0 failed` and a 4-line `metadata.csv` (header + one row 
 
 ## What it does
 
-Selects ComfyUI-generated clips or images, builds layout variants (`grid`, `montage`, `single`, `cta_only`), runs ffmpeg effects (glitch, reverse, rainbow border, motion blur), mixes random audio, and fills empty metadata fields via a local Ollama or llama.cpp LLM. Path handling passes through unchanged on native Linux and macOS; only WSL rewrites paths to Windows form for a Windows-side `ffmpeg.exe`/`ffprobe.exe` (see `tests/test_paths.py`).
+Turns a directory of ComfyUI clips or images into short-form video ready to post: four layout variants (`grid`, `montage`, `single`, `cta_only`), four ffmpeg effects (glitch, reverse, rainbow border, motion blur), random audio mixing, and local-LLM metadata fill (Ollama, llama.cpp, or none). Paths pass through unchanged on native Linux and macOS; only WSL rewrites them to Windows form for a Windows-side `ffmpeg.exe`/`ffprobe.exe` (see `tests/test_paths.py`).
 
 ## Layout
 
