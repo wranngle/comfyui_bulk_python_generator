@@ -1,29 +1,55 @@
-# comfyui_bulk_python_generator
+<div align="center">
 
-> bulk post-processing for ComfyUI video: layout variants, ffmpeg effects, Ollama metadata fill
+#### batch pipeline · checkpoint resume · provenance sidecars · progress dashboard
+
+# bulk post-processing for ComfyUI video: layout variants, ffmpeg effects, Ollama metadata fill
+
+**[Quickstart](#quickstart) · [What it does](#what-it-does) · [Run](#run) · [Variant types](#variant-types) · [Testing](#testing) · [License](#license)**
 
 [![License](https://img.shields.io/github/license/wranngle/comfyui_bulk_python_generator?color=A371F7)](./LICENSE) ![Status](https://img.shields.io/badge/status-experimental-orange.svg)
 
-> [!NOTE]
-> Experiment. Built to learn one specific thing. Code may not survive.
+*Experiment. Built to learn one specific thing. Code may not survive.*
 
-## Quickstart (60-second first user moment)
+<img src="demo/extract.gif" alt="comfybulk extract running against the bundled fixture clips" width="720">
 
-No ComfyUI and no config.toml required; needs ffprobe on PATH. Just the bundled fixture clips at `tests/fixtures/samples/`. Verifies metadata extraction works end-to-end on a fresh clone.
+*metadata extraction on the bundled fixture clips*
 
-```bash
-git clone https://github.com/wranngle/comfyui_bulk_python_generator.git && cd comfyui_bulk_python_generator
-python3 -m venv .venv && . .venv/bin/activate && pip install -e .
-cp -r tests/fixtures/samples /tmp/comfybulk-quickstart && cd /tmp/comfybulk-quickstart
-python3 -c "from comfybulk.extract import process_directory; ok, fail = process_directory('.', 'metadata.csv', test_mode=False); print(f'{ok} extracted, {fail} failed')"
-head -n 4 metadata.csv
-```
-
-Expected: `3 extracted, 0 failed` and a 4-line `metadata.csv` (header + one row per fixture clip). From here, point the full pipeline at your own ComfyUI output directory; see [Run](#run).
+</div>
 
 ## What it does
 
 Turns a directory of ComfyUI clips or images into short-form video ready to post: four layout variants (`grid`, `montage`, `single`, `cta_only`), four ffmpeg effects (glitch, reverse, rainbow border, motion blur), random audio mixing, and local-LLM metadata fill (Ollama, llama.cpp, or none). Paths pass through unchanged on native Linux and macOS; only WSL rewrites them to Windows form for a Windows-side `ffmpeg.exe`/`ffprobe.exe` (see `tests/test_paths.py`).
+
+| layout variants | named effects | audio mix | metadata fill |
+|:---:|:---:|:---:|:---:|
+| grid · montage · single · cta_only | glitch · reverse · rainbow · motion blur | time-stretch · loudnorm | ollama · llamacpp · none |
+
+**A folder of ComfyUI clips in. Platform-ready shorts out.**
+
+## Quickstart
+
+No ComfyUI and no config edits required; needs ffprobe on PATH. The bundled fixture clips at `tests/fixtures/samples/` drive a real end-to-end metadata extraction on a fresh clone.
+
+1. Clone and install:
+
+   ```bash
+   git clone https://github.com/wranngle/comfyui_bulk_python_generator.git && cd comfyui_bulk_python_generator
+   python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+   ```
+
+2. Extract metadata from the bundled fixtures:
+
+   ```bash
+   comfybulk --config config.example.toml extract --path tests/fixtures/samples --csv out.csv
+   ```
+
+3. Inspect the result:
+
+   ```bash
+   head -n 4 out.csv
+   ```
+
+Expected: `Extracted 3, failed 0` and a 4-line `out.csv` (header plus one row per fixture clip, seeds and prompts parsed). From here, point the full pipeline at your own ComfyUI output directory; see [Run](#run).
 
 ## Layout
 
@@ -48,7 +74,7 @@ src/comfybulk/
 ├── dash/         # server.py + state.py: stdlib HTTP progress dashboard
 ├── export/       # shopify.py: pipeline outputs → Shopify CSV
 ├── recipes/      # named recipe templates: etsy-product, realestate-listing, social-square
-├── __main__.py   # CLI: `comfybulk <subcommand>`
+├── __main__.py   # CLI: `comfybulk <subcommand>` (15 subcommands)
 └── data/         # bundled with the package via importlib.resources
     ├── ai_metadata_prompts.csv  # LLM prompt templates per metadata field
     └── captions.csv             # CTA caption strings
@@ -155,7 +181,7 @@ The bulk pipeline applies the full effects stack (glitch -> reverse -> rainbow -
 ## Testing
 
 ```bash
-pytest                       # unit tests; integration is excluded by default
+pytest                       # 156 unit tests; integration is excluded by default
 COMFYBULK_REAL_TEST_CLIP=/path/to/clip.mp4 pytest -m integration
 ```
 
