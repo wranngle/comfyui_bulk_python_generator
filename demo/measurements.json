@@ -1,0 +1,32 @@
+{
+  "repo": "wranngle/comfyui_bulk_python_generator",
+  "commit": "a963fe4 (origin/main, detached worktree)",
+  "measured_at": "2026-07-11T12:19:00-05:00",
+  "artifact": "extract.gif",
+  "measurements": {
+    "extract_run": {
+      "value": "Extracted 3, failed 0",
+      "command": "comfybulk --config config.example.toml extract --path tests/fixtures/samples --csv out.csv",
+      "exit_code": 0,
+      "environment": "fresh python3 venv, pip install -e ., ffprobe /usr/bin/ffprobe; real committed fixture MP4s, no network, no ComfyUI"
+    },
+    "csv_payoff": {
+      "value": "3 rows, real seeds 11088870617100560/562/564 and embedded prompts parsed from fixture metadata",
+      "command": "cut -d, -f2,3 out.csv | column -s, -t"
+    },
+    "gif": {
+      "encode": "vhs v0.11.0 (1200x720, FontSize 18, Padding 20, Catppuccin Frappe) -> ffmpeg fps=10 scale=720 lanczos palettegen/paletteuse",
+      "dimensions": "720x432",
+      "frames": 111,
+      "bytes": 57181
+    }
+  },
+  "verification": {
+    "reverified_at": "2026-07-11T12:27:00-04:00",
+    "method": "fresh detached worktree at a963fe4, fresh venv, pip install -e ., re-ran exact command",
+    "result": "Extracted 3, failed 0; exit 0; identical 3 seeds (11088870617100560/562/564) and prompts reproduced",
+    "frame_check": "f1/f2 saved frames plus gifcheck-1/2 extracted directly from extract.gif all show real command and CSV payoff"
+  },
+  "verdict": "hero built, no heroless fallback needed",
+  "caption_candidate": "Seeds and prompts pulled from raw ComfyUI clips."
+}
